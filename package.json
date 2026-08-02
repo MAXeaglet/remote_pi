@@ -1,0 +1,14 @@
+{
+  "name": "remote-pi",
+  "version": "0.6.0-omp.1",
+  "description": "Remote Pi (omp-compatible fork): agent network + remote control for Pi/omp coding agents",
+  "type": "module",
+  "main": "pi-extension/dist/index.js",
+  "exports": {
+    ".": "./pi-extension/dist/index.js"
+  },
+  "files": [
+    "pi-extension/dist"
+  ],
+  "license": "MIT"
+}
