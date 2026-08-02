@@ -5044,8 +5044,9 @@ if (_isDirectRun()) {
     else if (op === "restart") { await _cmdDaemonRestart(stubCtx, cliArgs[1]); }
     else if (op === "status")  { await _cmdDaemonStatus(stubCtx); }
     else if (op === "send")    { await _cmdDaemonSend(rest, stubCtx); }
+    else if (op === "switch")  { await _cmdDaemonSwitch(rest, stubCtx); }
     else {
-      console.log("Usage: remote-omp daemon <start|stop|restart [<id>]|status|send <id> \"<text>\">");
+      console.log("Usage: remote-omp daemon <start|stop|restart [<id>]|status|send <id> \"<text>\"|switch <id> <sessionPath>>");
     }
   } else if (subcmd === "cron") {
     // `remote-omp cron <op> [args]`. Re-quote args with spaces so the shared
