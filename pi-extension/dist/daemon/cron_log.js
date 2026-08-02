@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 const PREVIEW_LEN = 80;
 function logPath() {
     const root = process.env["REMOTE_PI_HOME"] || homedir();
-    return join(root, ".pi", "remote", "cron.jsonl");
+    return join(root, ".omp", "remote", "cron.jsonl");
 }
 /** Test/diag-only: the on-disk path. */
 export function cronLogPath() {

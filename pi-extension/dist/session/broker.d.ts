@@ -145,7 +145,7 @@ export declare class Broker {
     private _handleRegister;
     /**
      * Answer a read-only `list_peers` request from an UNREGISTERED connection
-     * (the `remote-pi peers` CLI probe). Returns true when the line was such a
+     * (the `remote-omp peers` CLI probe). Returns true when the line was such a
      * probe — the reply is written and the connection stays unregistered: no
      * name assigned, no `peer_joined`/`peer_left` broadcast, no sibling push, so
      * querying the roster from the shell never perturbs the mesh. Returns false

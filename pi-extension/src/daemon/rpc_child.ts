@@ -28,7 +28,7 @@ export interface RpcChildOptions {
   piBin?: string;
   /** True when the agent binary is omp (oh-my-pi) — adjusts spawn flags. */
   agentIsOmp?: boolean;
-  /** Absolute path to the remote-pi `dist/index.js` to load as -e. */
+  /** Absolute path to the remote-omp `dist/index.js` to load as -e. */
   extensionPath: string;
   /** Working directory for the spawned process. Determines which local
    *  config the extension reads. */
@@ -38,7 +38,7 @@ export interface RpcChildOptions {
   env?: NodeJS.ProcessEnv;
   /**
    * Daemon config injected into the child via `REMOTE_PI_DIRECT_CONFIG`
-   * (JSON inline) instead of a per-cwd `.pi/remote-pi/config.json` file. The
+   * (JSON inline) instead of a per-cwd `.omp/remote-omp/config.json` file. The
    * supervisor builds this from the registry. When set, the child reads it
    * env-first (see `loadLocalConfig`) and no config file is needed. Also the
    * source of the `--name` for the session. Falls back to the on-disk config
@@ -193,19 +193,19 @@ function parseGetStateResponse(line: string): { id?: string; isStreaming?: boole
  * `--name <sessionName>`, when given, pins the session's display name to the
  * daemon's identity (its `agent_name`) so every restart shows up under the
  * same stable name in the picker/app instead of an auto-generated one. The
- * daemon's name is set at registration (`remote-pi create <cwd> --name "…"`).
+ * daemon's name is set at registration (`remote-omp create <cwd> --name "…"`).
  * Omitted when no name resolves, so the arg list stays minimal.
  *
  * `--approve` is mandatory for a daemon (pi ≥0.79 project trust): RPC mode is
  * non-interactive, so without an override Pi resolves an untrusted project
- * folder (any folder with `.pi/` or CLAUDE.md/AGENTS.md) to NOT trusted and
- * silently skips its `.pi/settings.json` (model/provider/keys), instructions,
+ * folder (any folder with `.omp/` or CLAUDE.md/AGENTS.md) to NOT trusted and
+ * silently skips its `.omp/settings.json` (model/provider/keys), instructions,
  * resources and project extensions — the daemon then comes up with no model
  * and fails on the first turn. The operator already authorized this folder by
  * registering/launching a daemon in it, so `--approve` (trust-for-this-run) is
  * the correct non-interactive stance. (Does NOT affect the separate "extension
  * loaded twice" conflict, which comes from the extension being BOTH installed
- * in ~/.pi/agent/extensions or cwd/.pi/extensions AND passed via `-e`.)
+ * in ~/.omp/agent/extensions or cwd/.omp/extensions AND passed via `-e`.)
  */
 export function rpcSpawnArgs(
   extensionPath: string,
@@ -309,7 +309,7 @@ export class RpcChild extends EventEmitter {
 
     child.stdout?.on("data", (chunk: Buffer) => this._onStdout(chunk));
     child.stderr?.on("data", (chunk: Buffer) => {
-      // Forward stderr to our own stderr so `journalctl --user -u remote-pi-supervisord`
+      // Forward stderr to our own stderr so `journalctl --user -u remote-omp-supervisord`
       // sees daemon logs (with cwd prefix for disambiguation).
       process.stderr.write(`[${this.opts.cwd}] ${chunk.toString()}`);
     });
@@ -318,7 +318,7 @@ export class RpcChild extends EventEmitter {
       // spawn() itself failed (e.g. `pi` binary not found).
       this._state = "crashed";
       process.stderr.write(
-        `[remote-pi-supervisord] spawn failed for ${this.opts.cwd}: ${String(err)}\n`,
+        `[remote-omp-supervisord] spawn failed for ${this.opts.cwd}: ${String(err)}\n`,
       );
       this.emit("exit", { code: null, signal: null, isCrash: true });
     });
@@ -337,6 +337,23 @@ export class RpcChild extends EventEmitter {
   sendPrompt(text: string, requestId?: string): boolean {
     if (!this.child || !this.child.stdin || this._state !== "running") return false;
     const cmd = { id: requestId ?? `sv-${Date.now()}`, type: "prompt", message: text };
+    try {
+      this.child.stdin.write(JSON.stringify(cmd) + "\n");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Switch the child's active session (RPC `switch_session`). omp/Pi RPC
+   * protocol supports switching sessions in a long-lived process, so a daemon
+   * can drive multiple sessions without a restart. Returns false if the child
+   * isn't running or the write fails.
+   */
+  switchSession(sessionPath: string, requestId?: string): boolean {
+    if (!this.child || !this.child.stdin || this._state !== "running") return false;
+    const cmd = { id: requestId ?? `sv-${Date.now()}`, type: "switch_session", sessionPath };
     try {
       this.child.stdin.write(JSON.stringify(cmd) + "\n");
       return true;

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-const CONFIG_DIR = path.join(os.homedir(), ".pi", "remote");
+const CONFIG_DIR = path.join(os.homedir(), ".omp", "remote");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 /**
  * Default community relay. Stored in canonical http(s):// form — conversion
@@ -34,7 +34,7 @@ export function saveConfig(patch) {
  *
  * Precedence:
  *   1. `REMOTE_PI_RELAY` env var (ops/CI escape hatch)
- *   2. `~/.pi/remote/config.json` `relay` field (set via /remote-pi set-relay)
+ *   2. `~/.omp/remote/config.json` `relay` field (set via /remote-omp set-relay)
  *   3. `kDefaultRelayUrl` (community default)
  *
  * Any ws(s):// values found (legacy configs or env overrides) are coerced
@@ -51,8 +51,8 @@ export function resolveRelayUrl() {
     return { url: toHttpUrl(kDefaultRelayUrl), source: "default" };
 }
 /**
- * Strict validator for **user-provided** relay URLs (via `/remote-pi
- * set-relay` or `/remote-pi relay url`).
+ * Strict validator for **user-provided** relay URLs (via `/remote-omp
+ * set-relay` or `/remote-omp relay url`).
  *
  * Only accepts `http://` and `https://`. `ws://`/`wss://` are deliberately
  * **rejected** — the canonical form stored in config is http(s):// and the

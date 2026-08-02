@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import qrTerminal from "qrcode-terminal";
 /** Default ephemeral-token lifetime (also the QR rotation period). */
 export const TOKEN_TTL_MS = 60_000;
-/** Bounds for a caller-supplied pairing TTL (e.g. `/remote-pi pair --ttl <s>`). */
+/** Bounds for a caller-supplied pairing TTL (e.g. `/remote-omp pair --ttl <s>`). */
 export const PAIR_TTL_MIN_MS = 10_000;
 export const PAIR_TTL_MAX_MS = 600_000;
 /** Clamp an arbitrary ttl (ms) into the safe pairing range; NaN → default. */

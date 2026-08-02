@@ -1,6 +1,6 @@
 /**
  * Cron registry: scheduled prompts for daemons, persisted at
- * `~/.pi/remote/cron.json`. Mirrors `registry.ts` (`daemons.json`) — tolerant
+ * `~/.omp/remote/cron.json`. Mirrors `registry.ts` (`daemons.json`) — tolerant
  * load (missing/corrupt → empty), atomic-ish full-file save.
  *
  * Each job targets a daemon by its `daemon_id` (the 8-hex id from

@@ -83,7 +83,7 @@ export interface ActionCtx {
     /**
      * Live session registry from Pi's extension ctx. Includes providers/models
      * registered dynamically via `pi.registerProvider(...)`, unlike the fallback
-     * disk-backed registry remote-pi can build on its own.
+     * disk-backed registry remote-omp can build on its own.
      */
     modelRegistry?: ActionModelRegistry;
 }

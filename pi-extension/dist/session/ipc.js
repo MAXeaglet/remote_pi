@@ -9,13 +9,13 @@ function safe(s) {
 }
 /**
  * Resolve a local-IPC address. On Windows returns a per-user named pipe
- * (`\\.\pipe\remote-pi-<suffix>-<user>`); on POSIX returns `filePath` (the
+ * (`\\.\pipe\remote-omp-<suffix>-<user>`); on POSIX returns `filePath` (the
  * filesystem UDS path) unchanged.
  */
 export function ipcAddress(suffix, filePath, plat = osPlatform(), user) {
     if (plat === "win32") {
         const u = safe((user ?? userInfo().username) || "user");
-        return `\\\\.\\pipe\\remote-pi-${safe(suffix)}-${u}`;
+        return `\\\\.\\pipe\\remote-omp-${safe(suffix)}-${u}`;
     }
     return filePath;
 }

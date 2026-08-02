@@ -34,7 +34,7 @@ export declare function _setKeyringRetryForTest(attempts: number | null, delayMs
 /**
  * Returns the Pi-secret Ed25519 keypair, generating + persisting one on
  * first call. Resolution order:
- *   1. Existing file `~/.pi/remote/identity.json`, if present — it WINS over
+ *   1. Existing file `~/.omp/remote/identity.json`, if present — it WINS over
  *      the keyring. A file identity is only ever written by the headless/
  *      degraded fallback (step 4) or an explicit `REMOTE_PI_ALLOW_FILE_IDENTITY`
  *      opt-in, so its mere presence means this machine established its identity
@@ -44,7 +44,7 @@ export declare function _setKeyringRetryForTest(attempts: number | null, delayMs
  *      it first would mask the file identity — returning a DIFFERENT key, or
  *      (when the keyring is empty) minting a fresh one and persisting it —
  *      silently breaking the existing pairing. So when both exist, file wins.
- *   2. New keyring service `dev.remotepi.pi` (read retried — a transiently
+ *   2. New keyring service `dev.remoteomp.omp` (read retried — a transiently
  *      locked Keychain throws; we don't treat that as "no key")
  *   3. Old keyring service `dev.remotepi.mac` (migrate → step 2, delete old)
  *   4. Generate a fresh keypair, BUT only when it's safe to: either both

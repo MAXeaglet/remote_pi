@@ -1,7 +1,7 @@
 export interface LocalConfig {
     agent_name?: string;
     /**
-     * If true (default), `/remote-pi` with no args auto-joins the local UDS
+     * If true (default), `/remote-omp` with no args auto-joins the local UDS
      * mesh and starts the relay on a fresh terminal. The field name is
      * historical (plano 21); the UX wording was reworked to "use the relay
      * on this terminal to connect to the remote mesh (mobile + PCs)". Legacy
@@ -37,7 +37,7 @@ export declare function sanitizeSegment(v: unknown): string | undefined;
 export declare function migrateAgentName(raw: string): string | undefined;
 /**
  * True when a local config is available for this cwd — either inline via
- * `REMOTE_PI_DIRECT_CONFIG` or as `<cwd>/.pi/remote-pi/config.json` on disk.
+ * `REMOTE_PI_DIRECT_CONFIG` or as `<cwd>/.omp/remote-omp/config.json` on disk.
  */
 export declare function localConfigExists(cwd: string): boolean;
 export declare function loadLocalConfig(cwd: string): LocalConfig;

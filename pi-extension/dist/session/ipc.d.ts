@@ -3,7 +3,7 @@
  *
  * Node's `net` implements local IPC differently per OS:
  *   - **POSIX**: a filesystem Unix-domain socket — a `.sock` path under
- *     `~/.pi/remote/`. The file lingers if the owner crashes (stale-socket
+ *     `~/.omp/remote/`. The file lingers if the owner crashes (stale-socket
  *     cleanup via `unlink` matters).
  *   - **Windows**: a **named pipe** (`\\.\pipe\<name>`). There is NO file —
  *     `existsSync`/`unlink` don't apply, and the pipe vanishes automatically
@@ -21,7 +21,7 @@ export type Plat = NodeJS.Platform;
 export declare function usesNamedPipe(plat?: Plat): boolean;
 /**
  * Resolve a local-IPC address. On Windows returns a per-user named pipe
- * (`\\.\pipe\remote-pi-<suffix>-<user>`); on POSIX returns `filePath` (the
+ * (`\\.\pipe\remote-omp-<suffix>-<user>`); on POSIX returns `filePath` (the
  * filesystem UDS path) unchanged.
  */
 export declare function ipcAddress(suffix: string, filePath: string, plat?: Plat, user?: string): string;

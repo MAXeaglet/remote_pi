@@ -146,7 +146,7 @@ export class Broker {
         }
     }
     async _handleLine(conn, line) {
-        // Unregistered conn: a read-only `list_peers` probe (the `remote-pi peers`
+        // Unregistered conn: a read-only `list_peers` probe (the `remote-omp peers`
         // CLI — answered without registering, so it leaves no trace on the mesh) or
         // the mandatory `register` handshake. Anything else `_handleRegister` drops.
         if (!conn.name) {
@@ -227,7 +227,7 @@ export class Broker {
     }
     /**
      * Answer a read-only `list_peers` request from an UNREGISTERED connection
-     * (the `remote-pi peers` CLI probe). Returns true when the line was such a
+     * (the `remote-omp peers` CLI probe). Returns true when the line was such a
      * probe — the reply is written and the connection stays unregistered: no
      * name assigned, no `peer_joined`/`peer_left` broadcast, no sibling push, so
      * querying the roster from the shell never perturbs the mesh. Returns false

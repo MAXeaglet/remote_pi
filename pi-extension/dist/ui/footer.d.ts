@@ -2,9 +2,9 @@
  * Footer renderer for the Pi TUI. Three status slots + window title.
  *
  * Slot keys (intentionally namespaced so other extensions don't collide):
- *   - remote-pi:session   — current local session + peer count
- *   - remote-pi:relay     — relay state (off / on / paired)
- *   - remote-pi:peer-active — active mobile device, if paired
+ *   - remote-omp:session   — current local session + peer count
+ *   - remote-omp:relay     — relay state (off / on / paired)
+ *   - remote-omp:peer-active — active mobile device, if paired
  */
 export interface FooterContext {
     ui: {

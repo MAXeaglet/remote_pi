@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 /**
- * `pi-supervisord` — long-running daemon supervisor.
+ * `omp-supervisord` — long-running daemon supervisor.
  *
- * Entry point of the `pi-supervisord` binary (plan/26 W2). Run by
+ * Entry point of the `omp-supervisord` binary (plan/26 W2). Run by
  * systemd/launchd in production, or directly during dev:
  *
  *   pnpm build
  *   node dist/bin/supervisord.js
  *
  * Once running, it:
- *   - Reads `~/.pi/remote/daemons.json`
- *   - Spawns `pi --mode rpc -e <remote-pi/dist/index.js>` per entry
- *   - Listens on `~/.pi/remote/supervisor.sock` for CLI control requests
+ *   - Reads `~/.omp/remote/daemons.json`
+ *   - Spawns `pi --mode rpc -e <remote-omp/dist/index.js>` per entry
+ *   - Listens on `~/.omp/remote/supervisor.sock` for CLI control requests
  *   - Restarts crashed children with exponential backoff
  *
- * Exits cleanly on SIGTERM/SIGINT (used by `remote-pi uninstall`).
+ * Exits cleanly on SIGTERM/SIGINT (used by `remote-omp uninstall`).
  */
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { Supervisor, SupervisorAlreadyRunningError, resolvePiBinOption } from "../daemon/supervisor.js";
-const HELP_TEXT = `pi-supervisord — Remote Pi daemon supervisor
+const HELP_TEXT = `omp-supervisord — Remote Pi daemon supervisor
 
-Usage: pi-supervisord
+Usage: omp-supervisord
 
-Runs the long-lived supervisor: reads ~/.pi/remote/daemons.json, spawns one
-\`pi --mode rpc\` child per entry, and listens on ~/.pi/remote/supervisor.sock
-for control requests from the \`remote-pi\` CLI.
+Runs the long-lived supervisor: reads ~/.omp/remote/daemons.json, spawns one
+\`pi --mode rpc\` child per entry, and listens on ~/.omp/remote/supervisor.sock
+for control requests from the \`remote-omp\` CLI.
 
 This binary takes NO arguments — it is normally launched by systemd/launchd
-(via \`remote-pi install\`), not by hand. Manage the fleet with:
-  remote-pi daemon start | stop | restart | status
-  remote-pi daemons
+(via \`remote-omp install\`), not by hand. Manage the fleet with:
+  remote-omp daemon start | stop | restart | status
+  remote-omp daemons
 
 Options:
   -h, --help      Show this help and exit
@@ -38,7 +38,7 @@ Options:
 `;
 async function main() {
     // Guard: any stray argument used to fall through and start a FULL
-    // supervisor (a `pi-supervisord --help` once ran for days). Handle the
+    // supervisor (a `omp-supervisord --help` once ran for days). Handle the
     // conventional flags explicitly and reject unknown args instead of
     // silently spawning the daemon fleet.
     const args = process.argv.slice(2);
@@ -47,12 +47,12 @@ async function main() {
         return;
     }
     if (args.includes("-v") || args.includes("--version")) {
-        process.stdout.write("pi-supervisord (remote-pi)\n");
+        process.stdout.write("omp-supervisord (remote-omp)\n");
         return;
     }
     if (args.length > 0) {
-        process.stderr.write(`pi-supervisord: unexpected argument(s): ${args.join(" ")}\n` +
-            "This binary takes no arguments. Run `pi-supervisord --help`.\n");
+        process.stderr.write(`omp-supervisord: unexpected argument(s): ${args.join(" ")}\n` +
+            "This binary takes no arguments. Run `omp-supervisord --help`.\n");
         process.exit(2);
     }
     // The supervisor needs to point each spawned Pi at the extension
@@ -63,9 +63,9 @@ async function main() {
     const extensionPath = join(distRoot, "index.js");
     const supervisor = new Supervisor({ extensionPath, piBin: resolvePiBinOption(undefined) });
     await supervisor.start();
-    process.stderr.write(`[pi-supervisord] up — UDS: ~/.pi/remote/supervisor.sock, extension: ${extensionPath}\n`);
+    process.stderr.write(`[omp-supervisord] up — UDS: ~/.omp/remote/supervisor.sock, extension: ${extensionPath}\n`);
     const shutdown = async (signal) => {
-        process.stderr.write(`[pi-supervisord] received ${signal}, shutting down\n`);
+        process.stderr.write(`[omp-supervisord] received ${signal}, shutting down\n`);
         await supervisor.stop();
         process.exit(0);
     };
@@ -77,10 +77,10 @@ main().catch((err) => {
     // race a manual start, or the user double-launches) — not a crash. Report
     // it calmly and exit 0 so service managers don't flag a failure loop.
     if (err instanceof SupervisorAlreadyRunningError) {
-        process.stderr.write(`[pi-supervisord] ${err.message}\n`);
+        process.stderr.write(`[omp-supervisord] ${err.message}\n`);
         process.exit(0);
     }
-    process.stderr.write(`[pi-supervisord] fatal: ${String(err)}\n`);
+    process.stderr.write(`[omp-supervisord] fatal: ${String(err)}\n`);
     process.exit(1);
 });
 //# sourceMappingURL=supervisord.js.map

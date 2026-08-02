@@ -31,14 +31,14 @@ export function findSupervisorScript() {
 }
 /**
  * Absolute path to the extension's CLI entry (`dist/index.js`). This is
- * the file we symlink to `~/.local/bin/remote-pi` so the user can run
- * `remote-pi <subcommand>` from any shell after installing the extension
- * through Pi (`pi install npm:remote-pi`).
+ * the file we symlink to `~/.local/bin/remote-omp` so the user can run
+ * `remote-omp <subcommand>` from any shell after installing the extension
+ * through Pi (`pi install npm:remote-omp`).
  *
  * Same resolution strategy as `findSupervisorScript`: from
  * `dist/daemon/install.js` → `dist/index.js`.
  */
-export function findRemotePiScript() {
+export function findRemoteOmpScript() {
     const here = fileURLToPath(import.meta.url); // dist/daemon/install.js
     const daemonDir = dirname(here); // dist/daemon
     const distRoot = dirname(daemonDir); // dist
@@ -47,7 +47,7 @@ export function findRemotePiScript() {
 export function findNodeBinary() {
     // `process.execPath` is always absolute and points at the current Node
     // binary. Embedding it in the service unit means the user gets the
-    // exact same Node version they invoked `remote-pi install` with — no
+    // exact same Node version they invoked `remote-omp install` with — no
     // PATH ambiguity at boot time.
     return process.execPath;
 }
@@ -66,19 +66,19 @@ export function findTemplate(name) {
 }
 // ── Service paths ──────────────────────────────────────────────────────────
 export function systemdUnitPath() {
-    return join(homedir(), ".config", "systemd", "user", "remote-pi-supervisord.service");
+    return join(homedir(), ".config", "systemd", "user", "remote-omp-supervisord.service");
 }
 export function launchdPlistPath() {
     return join(homedir(), "Library", "LaunchAgents", "dev.remotepi.supervisord.plist");
 }
 export const LAUNCHD_LABEL = "dev.remotepi.supervisord";
 /** systemd --user unit name (with `.service`) for the supervisor. */
-export const SYSTEMD_UNIT = "remote-pi-supervisord.service";
+export const SYSTEMD_UNIT = "remote-omp-supervisord.service";
 /** Windows Task Scheduler task name (plan/40). */
-export const WINDOWS_TASK_NAME = "RemotePiSupervisor";
+export const WINDOWS_TASK_NAME = "RemoteOmpSupervisor";
 /** Path of the rendered Task Scheduler XML (input to `schtasks /Create /XML`). */
 export function taskXmlPath() {
-    return join(homedir(), ".pi", "remote", "RemotePiSupervisor.xml");
+    return join(homedir(), ".omp", "remote", "RemoteOmpSupervisor.xml");
 }
 /**
  * Path of the rendered VBScript launcher the Task Scheduler action invokes
@@ -86,16 +86,16 @@ export function taskXmlPath() {
  * wrapper is what keeps the supervisor from flashing a console window.
  */
 export function vbsLauncherPath() {
-    return join(homedir(), ".pi", "remote", "RemotePiSupervisorLauncher.vbs");
+    return join(homedir(), ".omp", "remote", "RemoteOmpSupervisorLauncher.vbs");
 }
 /**
  * Combined stdout/stderr log for the Windows supervisor. The Task Scheduler
  * launches it hidden via wscript, so without this redirect its output (and the
  * forwarded daemon-child stderr) would vanish — mirrors launchd/systemd, which
- * already log to `~/.pi/remote/supervisord.log`.
+ * already log to `~/.omp/remote/supervisord.log`.
  */
 export function supervisordLogPath() {
-    return join(homedir(), ".pi", "remote", "supervisord.log");
+    return join(homedir(), ".omp", "remote", "supervisord.log");
 }
 export function defaultRenderVars() {
     return {
@@ -135,7 +135,7 @@ export function installService(vars = defaultRenderVars()) {
     // Sanity: supervisor script must exist on disk.
     if (!existsSync(vars.supervisor)) {
         throw new Error(`supervisor script not found at ${vars.supervisor}. ` +
-            "Run `pnpm build` (dev) or `npm install -g remote-pi` (prod) first.");
+            "Run `pnpm build` (dev) or `npm install -g remote-omp` (prod) first.");
     }
     const templateName = plat === "macos" ? "launchd" : plat === "linux" ? "systemd" : "taskscheduler";
     const templatePath = findTemplate(templateName);
@@ -169,7 +169,7 @@ export function installService(vars = defaultRenderVars()) {
     }
     else if (plat === "linux") {
         _exec("systemctl", ["--user", "daemon-reload"], log);
-        _exec("systemctl", ["--user", "enable", "--now", "remote-pi-supervisord.service"], log);
+        _exec("systemctl", ["--user", "enable", "--now", "remote-omp-supervisord.service"], log);
         log.push("activated via systemctl --user enable --now");
     }
     else {
@@ -185,7 +185,7 @@ export function installService(vars = defaultRenderVars()) {
         // Only `schtasks /Create` modifies the root task store → that single op
         // needs admin (elevate it via UAC). `/End` (stop a prior instance) and
         // `/Run` (start it) act on a task we already own and work un-elevated — the
-        // very ops `remote-pi restart-supervisor` runs without elevation. Keeping
+        // very ops `remote-omp restart-supervisor` runs without elevation. Keeping
         // them un-elevated narrows the admin surface to the one operation that
         // truly requires it.
         _tryExec("schtasks", ["/End", "/TN", WINDOWS_TASK_NAME], log);
@@ -211,7 +211,7 @@ export function uninstallService() {
         log.push("deactivated via launchctl bootout");
     }
     else if (plat === "linux") {
-        _tryExec("systemctl", ["--user", "disable", "--now", "remote-pi-supervisord.service"], log);
+        _tryExec("systemctl", ["--user", "disable", "--now", "remote-omp-supervisord.service"], log);
         log.push("deactivated via systemctl --user disable --now");
     }
     else {
@@ -316,7 +316,7 @@ function _readIfExists(p) {
  * output is appended to `log` either way.
  */
 function _execElevatedWindows(lines, log) {
-    const base = join(tmpdir(), `remote-pi-elevate-${process.pid}`);
+    const base = join(tmpdir(), `remote-omp-elevate-${process.pid}`);
     const cmdPath = `${base}.cmd`;
     const logFile = `${base}.log`;
     writeFileSync(cmdPath, buildElevatedCmd(lines, logFile));
@@ -365,7 +365,7 @@ export function isOnPath(dir, envPath = process.env["PATH"] ?? "") {
     return envPath.split(delimiter).some((entry) => entry.replace(/\/+$/, "") === target);
 }
 /**
- * Create (or refresh) the `remote-pi` + `pi-supervisord` symlinks in
+ * Create (or refresh) the `remote-omp` + `omp-supervisord` symlinks in
  * `~/.local/bin/`. Idempotent — replaces stale links pointing at old
  * extension paths (Pi can reinstall the extension to a different hash dir
  * on upgrades, so this MUST overwrite).
@@ -377,7 +377,7 @@ export function isOnPath(dir, envPath = process.env["PATH"] ?? "") {
 export function linkCliBinaries(home = homedir(), paths = {}, opts = {}) {
     const binDir = userLocalBinDir(home);
     // Windows (plan/40): no POSIX symlinks. Installing via Pi (`pi install
-    // npm:remote-pi`) never reaches PATH, so write real `.cmd` shims into
+    // npm:remote-omp`) never reaches PATH, so write real `.cmd` shims into
     // `~/.local/bin` and add that dir to the user's PATH (HKCU — no admin).
     if (platform() === "win32") {
         return _linkCliBinariesWindows(home, binDir, paths, opts);
@@ -385,10 +385,10 @@ export function linkCliBinaries(home = homedir(), paths = {}, opts = {}) {
     const log = [];
     mkdirSync(binDir, { recursive: true });
     log.push(`ensured ${binDir}`);
-    const remotePi = paths.remotePi ?? findRemotePiScript();
+    const remotePi = paths.remotePi ?? findRemoteOmpScript();
     const supervisord = paths.supervisord ?? findSupervisorScript();
     if (!existsSync(remotePi)) {
-        throw new Error(`remote-pi script not found at ${remotePi}. ` +
+        throw new Error(`remote-omp script not found at ${remotePi}. ` +
             "Run `pnpm build` (dev) or reinstall the extension.");
     }
     if (!existsSync(supervisord)) {
@@ -408,8 +408,8 @@ export function linkCliBinaries(home = homedir(), paths = {}, opts = {}) {
     }
     catch { /* best-effort */ }
     const links = [
-        { name: "remote-pi", path: join(binDir, "remote-pi"), target: remotePi },
-        { name: "pi-supervisord", path: join(binDir, "pi-supervisord"), target: supervisord },
+        { name: "remote-omp", path: join(binDir, "remote-omp"), target: remotePi },
+        { name: "omp-supervisord", path: join(binDir, "omp-supervisord"), target: supervisord },
     ];
     for (const link of links) {
         _replaceSymlink(link.path, link.target, log);
@@ -423,8 +423,8 @@ export function linkCliBinaries(home = homedir(), paths = {}, opts = {}) {
     return { binDir, links, onPath, log };
 }
 /**
- * Windows variant of `linkCliBinaries`: writes `remote-pi.cmd` +
- * `pi-supervisord.cmd` shims into `~/.local/bin` and ensures that dir is on the
+ * Windows variant of `linkCliBinaries`: writes `remote-omp.cmd` +
+ * `omp-supervisord.cmd` shims into `~/.local/bin` and ensures that dir is on the
  * user's PATH (User scope — no admin). `opts.node` overrides the node binary
  * (tests); `opts.mutatePath === false` skips the real PATH mutation (tests).
  */
@@ -434,10 +434,10 @@ function _linkCliBinariesWindows(home, binDir, paths, opts) {
     mkdirSync(binDir, { recursive: true });
     log.push(`ensured ${binDir}`);
     const node = opts.node ?? findNodeBinary();
-    const remotePi = paths.remotePi ?? findRemotePiScript();
+    const remotePi = paths.remotePi ?? findRemoteOmpScript();
     const supervisord = paths.supervisord ?? findSupervisorScript();
     if (!existsSync(remotePi)) {
-        throw new Error(`remote-pi script not found at ${remotePi}. ` +
+        throw new Error(`remote-omp script not found at ${remotePi}. ` +
             "Run `pnpm build` (dev) or reinstall the extension.");
     }
     if (!existsSync(supervisord)) {
@@ -445,8 +445,8 @@ function _linkCliBinariesWindows(home, binDir, paths, opts) {
             "Run `pnpm build` (dev) or reinstall the extension.");
     }
     const links = [
-        { name: "remote-pi.cmd", path: join(binDir, "remote-pi.cmd"), target: remotePi },
-        { name: "pi-supervisord.cmd", path: join(binDir, "pi-supervisord.cmd"), target: supervisord },
+        { name: "remote-omp.cmd", path: join(binDir, "remote-omp.cmd"), target: remotePi },
+        { name: "omp-supervisord.cmd", path: join(binDir, "omp-supervisord.cmd"), target: supervisord },
     ];
     for (const link of links) {
         writeFileSync(link.path, buildCmdShim(node, link.target));
@@ -456,7 +456,7 @@ function _linkCliBinariesWindows(home, binDir, paths, opts) {
     if (!onPath && opts.mutatePath !== false) {
         try {
             _addUserPath(binDir);
-            log.push(`added ${binDir} to your user PATH — open a NEW terminal for \`remote-pi\` to resolve.`);
+            log.push(`added ${binDir} to your user PATH — open a NEW terminal for \`remote-omp\` to resolve.`);
         }
         catch (e) {
             log.push(`WARNING: ${binDir} is not on PATH and auto-add failed (${String(e)}). ` +
@@ -493,8 +493,8 @@ export function unlinkCliBinaries(home = homedir()) {
     // Windows shims are `.cmd` files (linkCliBinaries writes those); POSIX uses
     // extensionless symlinks. Match what was actually created on this platform.
     const names = platform() === "win32"
-        ? ["remote-pi.cmd", "pi-supervisord.cmd"]
-        : ["remote-pi", "pi-supervisord"];
+        ? ["remote-omp.cmd", "omp-supervisord.cmd"]
+        : ["remote-omp", "omp-supervisord"];
     const removed = [];
     for (const name of names) {
         const path = join(binDir, name);

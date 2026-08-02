@@ -160,7 +160,7 @@ describe("localConfig integration with the wizard", () => {
     });
   });
 
-  test("/remote-pi setup with existing config: wizard uses current as defaults", async () => {
+  test("/remote-omp setup with existing config: wizard uses current as defaults", async () => {
     // Simulates the data flow without invoking the real handler.
     const cwd = tmpCwd();
     saveLocalConfig(cwd, {
@@ -187,9 +187,9 @@ describe("localConfig integration with the wizard", () => {
 
   test("legacy config without auto_start_relay → treated as true", () => {
     const cwd = tmpCwd();
-    const cfgPath = join(cwd, ".pi", "remote-pi", "config.json");
+    const cfgPath = join(cwd, ".pi", "remote-omp", "config.json");
     const { mkdirSync, writeFileSync } = require("node:fs") as typeof import("node:fs");
-    mkdirSync(join(cwd, ".pi", "remote-pi"), { recursive: true });
+    mkdirSync(join(cwd, ".pi", "remote-omp"), { recursive: true });
     writeFileSync(
       cfgPath,
       JSON.stringify({ agent_name: "legacy" }, null, 2),
@@ -213,9 +213,9 @@ describe("localConfig integration with the wizard", () => {
     // local UDS mesh is always a single fixed session — the field has no
     // meaning. Load should ignore it without error and not persist it back.
     const cwd = tmpCwd();
-    const cfgPath = join(cwd, ".pi", "remote-pi", "config.json");
+    const cfgPath = join(cwd, ".pi", "remote-omp", "config.json");
     const { mkdirSync, writeFileSync } = require("node:fs") as typeof import("node:fs");
-    mkdirSync(join(cwd, ".pi", "remote-pi"), { recursive: true });
+    mkdirSync(join(cwd, ".pi", "remote-omp"), { recursive: true });
     writeFileSync(
       cfgPath,
       JSON.stringify({

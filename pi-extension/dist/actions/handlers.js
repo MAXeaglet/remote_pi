@@ -110,7 +110,7 @@ export async function handleModelSet(pi, ctx, reg, sender, msg, onPersist) {
     await runAsync(sender, msg, "model_set", async () => {
         // Prefer Pi's LIVE session registry when available so the app sees models
         // registered dynamically by extensions via `pi.registerProvider(...)`.
-        // Fall back to remote-pi's own disk-backed registry when no ctx exists.
+        // Fall back to remote-omp's own disk-backed registry when no ctx exists.
         const liveReg = ctx?.modelRegistry ?? reg;
         // Refresh first so a model just-added via `/login` is visible.
         liveReg.refresh();
@@ -136,7 +136,7 @@ export function handleListModels(ctx, reg, sender, msg) {
     try {
         // Prefer Pi's LIVE session registry when available so the app sees models
         // registered dynamically by extensions via `pi.registerProvider(...)`.
-        // Fall back to remote-pi's own disk-backed registry when no ctx exists.
+        // Fall back to remote-omp's own disk-backed registry when no ctx exists.
         const liveReg = ctx?.modelRegistry ?? reg;
         liveReg.refresh();
         const models = liveReg.getAvailable().map(wireFromModel);

@@ -14,7 +14,7 @@ export declare class SupervisorOfflineError extends Error {
 export declare function callSupervisor<Op extends ControlRequest["op"]>(req: Extract<ControlRequest, {
     op: Op;
 }>): Promise<ControlReplyFor<Op>>;
-/** Returns true when the supervisor is reachable. Used by `/remote-pi
+/** Returns true when the supervisor is reachable. Used by `/remote-omp
  *  daemons` to decide whether to query runtime state or fall back to
  *  registry-only listing. */
 export declare function supervisorOnline(): Promise<boolean>;

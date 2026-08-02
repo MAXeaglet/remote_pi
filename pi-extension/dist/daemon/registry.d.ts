@@ -4,7 +4,7 @@ export interface DaemonEntry {
     /**
      * Display name (mesh `agent_name`). Persisted here because the supervisor
      * now injects the daemon's config via `REMOTE_PI_DIRECT_CONFIG` at spawn
-     * instead of reading a per-cwd `.pi/remote-pi/config.json`. Legacy entries
+     * instead of reading a per-cwd `.omp/remote-omp/config.json`. Legacy entries
      * (cwd only) fall back to `defaultAgentName(cwd)`.
      */
     name?: string;
@@ -17,7 +17,7 @@ export interface DaemonRegistry {
  * components against `process.cwd()`, and runs `realpath` to canonicalize
  * symlinks. Throws if the resulting path doesn't exist on disk.
  *
- * `/remote-pi create` always stores normalized paths so two registrations
+ * `/remote-omp create` always stores normalized paths so two registrations
  * of the same logical folder via different aliases produce a single entry.
  */
 export declare function normalizeCwd(input: string): string;
@@ -59,5 +59,5 @@ export declare function listDaemons(): Array<{
 export declare function migrateRegistryNames(): number;
 /** Test/diag-only: returns the on-disk path. Exported so tests can poke
  *  at it (e.g. tmpdir override is done via env, but for now the path is
- *  hardcoded to ~/.pi/remote/daemons.json). */
+ *  hardcoded to ~/.omp/remote/daemons.json). */
 export declare function registryPath(): string;

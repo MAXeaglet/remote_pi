@@ -1,5 +1,5 @@
 /**
- * Append-only audit trail for cron fires at `~/.pi/remote/cron.jsonl`.
+ * Append-only audit trail for cron fires at `~/.omp/remote/cron.jsonl`.
  *
  * One JSON line per scheduler decision — **every fire AND every skip** — so an
  * operator can see exactly what ran and what didn't (the agent's output goes

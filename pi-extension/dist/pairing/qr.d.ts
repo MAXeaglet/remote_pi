@@ -1,6 +1,6 @@
 /** Default ephemeral-token lifetime (also the QR rotation period). */
 export declare const TOKEN_TTL_MS = 60000;
-/** Bounds for a caller-supplied pairing TTL (e.g. `/remote-pi pair --ttl <s>`). */
+/** Bounds for a caller-supplied pairing TTL (e.g. `/remote-omp pair --ttl <s>`). */
 export declare const PAIR_TTL_MIN_MS = 10000;
 export declare const PAIR_TTL_MAX_MS = 600000;
 /** Clamp an arbitrary ttl (ms) into the safe pairing range; NaN → default. */

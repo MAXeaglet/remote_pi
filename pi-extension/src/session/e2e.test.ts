@@ -1207,7 +1207,7 @@ describe("ACK protocol (plan/25 Wave 0)", () => {
     await orq.leave(); await a.leave(); await b.leave();
   });
 
-  // ── `remote-pi peers` observer probe (read-only roster) ─────────────────────
+  // ── `remote-omp peers` observer probe (read-only roster) ─────────────────────
 
   test("unregistered list_peers probe returns the roster without joining", async () => {
     const sock = tmpSock();

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ipcAddress, usesNamedPipe } from "./ipc.js";
-const HOME_PI_REMOTE = join((process.env["REMOTE_PI_HOME"] || homedir()), ".pi", "remote");
+const HOME_PI_REMOTE = join((process.env["REMOTE_PI_HOME"] || homedir()), ".omp", "remote");
 const SESSIONS_DIR = join(HOME_PI_REMOTE, "sessions");
 const SKILLS_DIR = join(HOME_PI_REMOTE, "skills");
 /**
@@ -14,7 +14,7 @@ const SKILLS_DIR = join(HOME_PI_REMOTE, "skills");
  * friction without value.
  */
 export const LOCAL_SESSION_NAME = "local";
-/** Ensures the new subdirs exist inside the existing ~/.pi/remote/. */
+/** Ensures the new subdirs exist inside the existing ~/.omp/remote/. */
 export function ensureGlobalDirs() {
     mkdirSync(SESSIONS_DIR, { recursive: true });
     mkdirSync(SKILLS_DIR, { recursive: true });

@@ -13,7 +13,7 @@ const CANCEL_TOKEN = "__cancel__";
  *   Final: review + confirm "Save and activate?" yes/no
  *
  * Daemon mode (run agents 24/7 via systemd/launchd) is intentionally NOT in
- * the wizard — it's an explicit, separate opt-in via `/remote-pi install`.
+ * the wizard — it's an explicit, separate opt-in via `/remote-omp install`.
  *
  * The local UDS mesh is always single per machine ("local" session) — no
  * session question. All Pis on the same machine see each other through

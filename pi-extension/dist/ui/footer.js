@@ -1,6 +1,6 @@
-const K_SESSION = "remote-pi:session";
-const K_RELAY = "remote-pi:relay";
-const K_PEER = "remote-pi:peer-active";
+const K_SESSION = "remote-omp:session";
+const K_RELAY = "remote-omp:relay";
+const K_PEER = "remote-omp:peer-active";
 export function updateFooter(ctx, state) {
     if (state.session) {
         const count = state.peerCount ?? 0;

@@ -4,8 +4,8 @@ import { encodeRequest, parseReply, } from "./control_protocol.js";
 import { getSupervisorSockPath } from "./supervisor.js";
 import { usesNamedPipe } from "../session/ipc.js";
 /**
- * Tiny client for the `remote-pi` CLI to call the supervisor over the
- * `~/.pi/remote/supervisor.sock` UDS.
+ * Tiny client for the `remote-omp` CLI to call the supervisor over the
+ * `~/.omp/remote/supervisor.sock` UDS.
  *
  * Each call opens a fresh connection, sends one request line, reads one
  * reply line, closes. No connection pooling — the CLI is short-lived,
@@ -13,7 +13,7 @@ import { usesNamedPipe } from "../session/ipc.js";
  *
  * `SupervisorOfflineError` is the common error: thrown when the socket
  * file is missing OR the connect fails (no listener). The CLI handler
- * formats it as a friendly "Run `remote-pi install` first" message.
+ * formats it as a friendly "Run `remote-omp install` first" message.
  */
 const CONNECT_TIMEOUT_MS = 1000;
 const REPLY_TIMEOUT_MS = 5000;
@@ -21,7 +21,7 @@ export class SupervisorOfflineError extends Error {
     sockPath;
     constructor(sockPath) {
         super(`Supervisor is not running. UDS not responding at ${sockPath}.\n` +
-            "Run `remote-pi install` to set it up, or start it manually with `pi-supervisord`.");
+            "Run `remote-omp install` to set it up, or start it manually with `omp-supervisord`.");
         this.sockPath = sockPath;
         this.name = "SupervisorOfflineError";
     }
@@ -53,7 +53,7 @@ export async function callSupervisor(req) {
         sock.destroy();
     }
 }
-/** Returns true when the supervisor is reachable. Used by `/remote-pi
+/** Returns true when the supervisor is reachable. Used by `/remote-omp
  *  daemons` to decide whether to query runtime state or fall back to
  *  registry-only listing. */
 export async function supervisorOnline() {

@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import type { TransportErrorReason } from "./envelope.js";
 import type { AckResult, SessionPeer } from "./peer.js";
 
-const NOT_IN_SESSION = "Not in a session. Run /remote-pi join first";
+const NOT_IN_SESSION = "Not in a session. Run /remote-omp join first";
 const ACK_TIMEOUT_MS = 5_000;
 const LEGACY_REQUEST_TIMEOUT_MS = 30_000;
 const LIST_PEERS_TIMEOUT_MS = 2_000;
@@ -277,7 +277,7 @@ function _formatAck(to: string, ack: AckResult, re: string | null | undefined): 
       // be honest that it was NOT delivered, and point at the fix.
       return `NOT delivered — "${to}"${reSuffix} came back BUSY, which only ` +
         `happens when an out-of-date broker leader dropped the message. ` +
-        `Restart the agent leading the local broker (oldest Pi/remote-pi process) ` +
+        `Restart the agent leading the local broker (oldest Pi/remote-omp process) ` +
         `to pick up the new build, then resend.`;
     case "denied":
       if (ack.reason === "not_authorized") {

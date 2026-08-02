@@ -6,11 +6,11 @@
  * connection as the HTTPS endpoints used by the mesh client.
  */
 export declare const kDefaultRelayUrl = "https://relay-rp1.jacobmoura.work";
-export type RemotePiConfig = {
+export type RemoteOmpConfig = {
     relay?: string;
 };
-export declare function loadConfig(): RemotePiConfig;
-export declare function saveConfig(patch: Partial<RemotePiConfig>): void;
+export declare function loadConfig(): RemoteOmpConfig;
+export declare function saveConfig(patch: Partial<RemoteOmpConfig>): void;
 export type RelayResolution = {
     url: string;
     source: "env" | "config" | "default";
@@ -20,7 +20,7 @@ export type RelayResolution = {
  *
  * Precedence:
  *   1. `REMOTE_PI_RELAY` env var (ops/CI escape hatch)
- *   2. `~/.pi/remote/config.json` `relay` field (set via /remote-pi set-relay)
+ *   2. `~/.omp/remote/config.json` `relay` field (set via /remote-omp set-relay)
  *   3. `kDefaultRelayUrl` (community default)
  *
  * Any ws(s):// values found (legacy configs or env overrides) are coerced
@@ -29,8 +29,8 @@ export type RelayResolution = {
  */
 export declare function resolveRelayUrl(): RelayResolution;
 /**
- * Strict validator for **user-provided** relay URLs (via `/remote-pi
- * set-relay` or `/remote-pi relay url`).
+ * Strict validator for **user-provided** relay URLs (via `/remote-omp
+ * set-relay` or `/remote-omp relay url`).
  *
  * Only accepts `http://` and `https://`. `ws://`/`wss://` are deliberately
  * **rejected** — the canonical form stored in config is http(s):// and the

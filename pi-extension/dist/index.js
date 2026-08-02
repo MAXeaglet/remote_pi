@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * pi-extension — remote-pi slash commands + AgentBridge wiring
+ * pi-extension — remote-omp slash commands + AgentBridge wiring
  *
  * Exported as ExtensionFactory (default export) to be loaded by Pi SDK:
  *   pi -e $(pwd)/dist/index.js
  *
  * State machine:  idle → started → paired
- *   /remote-pi start   connects to relay (idle → started)
- *   /remote-pi pair    shows QR for new peers (started, async → paired via auto-listener)
- *   /remote-pi stop    closes everything (any → idle)
+ *   /remote-omp start   connects to relay (idle → started)
+ *   /remote-omp pair    shows QR for new peers (started, async → paired via auto-listener)
+ *   /remote-omp stop    closes everything (any → idle)
  *
  * Pairing (post plano 06 — sem Noise XX):
  *   App envia inner `pair_request` (id, token, device_name) sobre canal opaco.
@@ -86,7 +86,7 @@ let _lastRelayStatus = null;
  *  and swallows it (`action:"handled"`) so it never becomes an LLM turn or a
  *  transcript entry. Starts with NUL so it can't collide with real user input
  *  and doesn't begin with "/" (which would route to the command parser). */
-export const CTRL_PREFIX = "\x00remote-pi-ctrl:";
+export const CTRL_PREFIX = "\x00remote-omp-ctrl:";
 let _relayUrl = null; // URL used by current _relay connection
 /**
  * Owners currently connected via the relay. Key = app peer pubkey (Ed25519,
@@ -98,11 +98,11 @@ let _relayUrl = null; // URL used by current _relay connection
  *     `_detachPeerChannel` (or `_goIdle` for the bulk teardown). Don't mutate
  *     directly elsewhere — those helpers keep the footer/log/state in sync.
  *   - `paired` UX state is `_activePeers.size > 0`. The footer and the
- *     `/remote-pi status` output both derive from this.
+ *     `/remote-omp status` output both derive from this.
  */
 const _activePeers = new Map();
 let _peerShort = ""; // shortid of the most recently attached peer (UX hint only)
-const REMOTE_PI_RECEIVED_IMAGE_TYPE = "remote-pi:received-image";
+const REMOTE_PI_RECEIVED_IMAGE_TYPE = "remote-omp:received-image";
 const RECEIVED_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const IMAGE_PREVIEW_MIME = "image/png";
 const IMAGE_CACHE_PREFIX = "pi-app-";
@@ -161,7 +161,7 @@ let _disposed = false;
 // True once the auto-init has run on the first session_start for this
 // process. Prevents re-running on session replacements (those re-init via
 // the _disposed re-arm path above). The session_start handler below auto-starts
-// remote-pi for ANY session whose local config has auto_start_relay (default
+// remote-omp for ANY session whose local config has auto_start_relay (default
 // true) — interactive AND daemon — instead of only REMOTE_PI_DAEMON=1.
 let _autoInited = false;
 // Cached state of global pairings (`peers.json`). Pairing is per-machine, so a
@@ -368,7 +368,7 @@ async function _collectReceivedImagePreviews(msg) {
         const image = msg.images[i];
         const mime = typeof image?.mime === "string" ? image.mime : "unknown";
         if (!image || typeof image.data !== "string") {
-            console.error(`[remote-pi] malformed image in message ${msg.id} index=${i}`);
+            console.error(`[remote-omp] malformed image in message ${msg.id} index=${i}`);
             previews.push({
                 messageId: msg.id,
                 index: i,
@@ -381,7 +381,7 @@ async function _collectReceivedImagePreviews(msg) {
         }
         const decoded = _decodeImagePayload(image.data, image.mime);
         if (!decoded.ok) {
-            console.error(`[remote-pi] skipped image id=${msg.id} index=${i}: ${decoded.reason}`);
+            console.error(`[remote-omp] skipped image id=${msg.id} index=${i}: ${decoded.reason}`);
             previews.push({
                 messageId: msg.id,
                 index: i,
@@ -394,7 +394,7 @@ async function _collectReceivedImagePreviews(msg) {
         }
         const ext = _imageExtension(image.mime);
         if (!ext) {
-            console.error(`[remote-pi] unsupported image mime in message ${msg.id} index=${i}: ${image.mime}`);
+            console.error(`[remote-omp] unsupported image mime in message ${msg.id} index=${i}: ${image.mime}`);
             previews.push({
                 messageId: msg.id,
                 index: i,
@@ -428,7 +428,7 @@ async function _collectReceivedImagePreviews(msg) {
         }
         catch (error) {
             const detail = error instanceof Error ? error.message : String(error);
-            console.error(`[remote-pi] failed saving image id=${msg.id} index=${i}: ${detail}`);
+            console.error(`[remote-omp] failed saving image id=${msg.id} index=${i}: ${detail}`);
             previews.push({
                 messageId: msg.id,
                 index: i,
@@ -540,7 +540,7 @@ async function _deliverImageUserMessage(sender, msg, shouldSteer) {
         }
         catch (error) {
             const detail = error instanceof Error ? error.message : String(error);
-            console.error(`[remote-pi] failed emitting image preview id=${msg.id}: ${detail}`);
+            console.error(`[remote-omp] failed emitting image preview id=${msg.id}: ${detail}`);
         }
     };
     if (previewDelivery === "immediate") {
@@ -652,7 +652,7 @@ function _refreshFooter(ctx) {
             relayOn: _state !== "idle",
             // `devicePaired` now reflects "any owner currently attached" — picks one
             // shortid representatively (multi-owner UX detail surfaces in the
-            // `/remote-pi status` line, not the footer slot).
+            // `/remote-omp status` line, not the footer slot).
             devicePaired: _anyPeerActive() ? _peerShort : undefined,
             hasPairings: _hasGlobalPairings,
             agentName: _meshNode?.name(),
@@ -663,7 +663,7 @@ function _refreshFooter(ctx) {
         // setStatus/setTitle can also throw if the runner went stale mid-call.
     }
 }
-// Epoch ms when the state machine entered 'started' (last /remote-pi start).
+// Epoch ms when the state machine entered 'started' (last /remote-omp start).
 // Used by session_sync to let the app detect Pi restarts (and force a full
 // replay). Cleared on _goIdle.
 let _sessionStartedAt = null;
@@ -773,7 +773,7 @@ function _maybeDrainQueuedItem() {
 }
 /** Test-only override of the message buffer. */
 /**
- * Test-only: emulate what `/remote-pi` does on the returning-user path
+ * Test-only: emulate what `/remote-omp` does on the returning-user path
  * (join the local mesh, then start the relay) without touching the FS for
  * a `localConfigExists()` lookup. Lets tests bring the relay up without
  * mocking the wizard or the local config storage.
@@ -787,7 +787,7 @@ export async function _connectForTest(ctx) {
     await _cmdJoin(real);
     await _cmdStart(real);
 }
-/** Test-only: tear everything down (mirrors `/remote-pi stop`). */
+/** Test-only: tear everything down (mirrors `/remote-omp stop`). */
 export async function _stopForTest(ctx) {
     await _cmdStop(ctx);
 }
@@ -819,7 +819,7 @@ export function _resetCwdLockForTest() {
 }
 /**
  * Test-only: relay-only startup, no UDS mesh join. Replaces the old
- * `remote-pi relay start` handler that some tests captured to bring up
+ * `remote-omp relay start` handler that some tests captured to bring up
  * the relay in isolation (e.g. ping/pong tests that don't care about the
  * agent-network broker).
  */
@@ -861,7 +861,7 @@ export function _setPiForTest(pi) {
     _pi = pi;
 }
 /**
- * Persist a model change to the PROJECT settings (`<cwd>/.pi/settings.json`) so
+ * Persist a model change to the PROJECT settings (`<cwd>/.omp/settings.json`) so
  * a model picked from the app survives a Pi/daemon restart. `pi.setModel` only
  * sets the LIVE model — on the next restart a fresh session reads the saved
  * default and reverts (the reported bug). We write the PROJECT scope, NOT
@@ -876,7 +876,7 @@ export function _setPiForTest(pi) {
  */
 function _persistModelDefault(provider, modelId) {
     try {
-        const path = join(process.cwd(), ".pi", "settings.json");
+        const path = join(process.cwd(), ".omp", "settings.json");
         let obj = {};
         try {
             const parsed = JSON.parse(readFileSync(path, "utf8"));
@@ -905,9 +905,9 @@ let _selfRevoke = null;
 let _selfRevokeEpoch = 0;
 let _selfRevokeTopologyReadyEpoch = -1;
 let _selfRevokeTopology = null;
-// Per-cwd lock acquired by the first `/remote-pi` invocation in this
+// Per-cwd lock acquired by the first `/remote-omp` invocation in this
 // process. Holds the UDS socket open until the process exits (OS auto-
-// releases on crash too). Stays held across `/remote-pi stop` cycles —
+// releases on crash too). Stays held across `/remote-omp stop` cycles —
 // only released when the Node process itself dies.
 let _cwdLock = null;
 // Effective mesh name this instance locked. Equals the configured/derived name,
@@ -941,7 +941,7 @@ let _relayLifecycleGeneration = 0;
 // those generations. Stop/off/session replacement advance this separate epoch
 // so a queued root can never regain authority by creating a newer child.
 let _rootLifecycleGeneration = 0;
-// Coalesces concurrent `/remote-pi` startup paths inside ONE extension instance.
+// Coalesces concurrent `/remote-omp` startup paths inside ONE extension instance.
 // Separate Pi processes still keep the existing #N behavior via the cwd lock.
 let _cmdRootInFlight = null;
 function _isCurrentRootLifecycle(generation) {
@@ -1031,7 +1031,7 @@ function _detachPeerChannel(appPeerId) {
  *   1. Broker-assigned name (when this Pi is on the local UDS mesh) — may
  *      carry a `#N` suffix from a name collision. Matches what other
  *      agents see, so the mobile UI shows the exact same string.
- *   2. `agent_name` from `<cwd>/.pi/remote-pi/config.json` — set by the
+ *   2. `agent_name` from `<cwd>/.omp/remote-omp/config.json` — set by the
  *      wizard on first run; this is "the name the user configured".
  *   3. `defaultAgentName(cwd)` (parent/folder) — fallback when no config
  *      exists yet and the mesh hasn't been joined.
@@ -1080,14 +1080,14 @@ function _runtimeOwnerFingerprint(runtimeKey) {
 function _inspectPeerRecord(record) {
     if (!record || typeof record !== "object") {
         const fingerprint = _rawOwnerFingerprint(record);
-        console.warn(`[remote-pi] event=invalid_owner_record owner_fp=${fingerprint}`);
+        console.warn(`[remote-omp] event=invalid_owner_record owner_fp=${fingerprint}`);
         return null;
     }
     const candidate = record;
     const rawHandle = candidate.remote_epk;
     if (typeof rawHandle !== "string") {
         const fingerprint = _rawOwnerFingerprint(rawHandle);
-        console.warn(`[remote-pi] event=invalid_owner_record owner_fp=${fingerprint}`);
+        console.warn(`[remote-omp] event=invalid_owner_record owner_fp=${fingerprint}`);
         return null;
     }
     const safeRecord = {
@@ -1101,17 +1101,17 @@ function _inspectPeerRecord(record) {
     }
     catch {
         const fingerprint = _rawOwnerFingerprint(rawHandle);
-        console.warn(`[remote-pi] event=invalid_owner_record owner_fp=${fingerprint}`);
+        console.warn(`[remote-omp] event=invalid_owner_record owner_fp=${fingerprint}`);
         return { record: safeRecord, rawHandle, runtimeKey: null };
     }
 }
 function _reportRevocationByFingerprint(canonicalOwnerPubkey) {
     const fingerprint = _runtimeOwnerFingerprint(canonicalOwnerPubkey);
     _pi?.sendMessage({
-        customType: "remote-pi:mesh-revoked",
+        customType: "remote-omp:mesh-revoked",
         content: `🔒 Revoked by Owner ${fingerprint}…\n\n` +
             `The mobile app for this Owner removed this PC from the mesh. ` +
-            `Re-pair via /remote-pi pair if this was unexpected.`,
+            `Re-pair via /remote-omp pair if this was unexpected.`,
         display: true,
     });
 }
@@ -1156,7 +1156,7 @@ function _goIdle(byeReason) {
     if (byeReason && _state !== "idle" && _anyPeerActive()) {
         _broadcastToActive({ type: "bye", reason: byeReason });
     }
-    // Cancel any pending reconnect attempt. Critical: /remote-pi stop must
+    // Cancel any pending reconnect attempt. Critical: /remote-omp stop must
     // win the race against a scheduled reconnect.
     if (_reconnectTimer !== null) {
         clearTimeout(_reconnectTimer);
@@ -1217,7 +1217,7 @@ function _onRelayClose(closedRelay) {
     if (_relay !== closedRelay)
         return; // delayed close from a replaced Relay
     if (_state === "idle")
-        return; // already torn down (e.g. /remote-pi stop)
+        return; // already torn down (e.g. /remote-omp stop)
     _relayLifecycleGeneration += 1;
     _stopAutoListener?.();
     _stopAutoListener = null;
@@ -1332,7 +1332,7 @@ function _relayStatus() {
     return _relay ? "connected" : "reconnecting";
 }
 /**
- * Emit the `remote-pi:relay-state` custom message so an RPC client (Cockpit)
+ * Emit the `remote-omp:relay-state` custom message so an RPC client (Cockpit)
  * can render a relay on/off indicator. Pure data (`display:false`) — never
  * shown in the transcript. De-duped on the connectivity value; pass
  * `force=true` to answer an explicit `relay:status` query regardless.
@@ -1343,7 +1343,7 @@ function _emitRelayState(force = false) {
         return;
     _lastRelayStatus = status;
     _pi?.sendMessage({
-        customType: "remote-pi:relay-state",
+        customType: "remote-omp:relay-state",
         content: `Relay ${status}`,
         details: {
             status,
@@ -1366,7 +1366,7 @@ function _controlCtx() {
 /**
  * `ui.notify` for headless contexts (daemon auto-init + control channel). There
  * is no TUI, and the RPC client (Cockpit) already gets everything it needs via
- * structured events (`remote-pi:relay-state`, `remote-pi:name-assigned`,
+ * structured events (`remote-omp:relay-state`, `remote-omp:name-assigned`,
  * room_meta) — so routine INFO chatter would just pollute the client's captured
  * stderr. We drop info and forward only warnings/errors (kept for the
  * supervisor's journal / genuine failures). The interactive Pi keeps its normal
@@ -1436,7 +1436,7 @@ export async function _handleControl(cmd) {
  *      name = a new room. We cycle the relay (`_goIdle` → `_cmdStart`) so the
  *      room follows; the app re-keys the conversation onto the new tile (the
  *      inherent cost of room-per-name). Skipped when the relay was off.
- * Finally re-emits `remote-pi:name-assigned` so the Cockpit updates its label.
+ * Finally re-emits `remote-omp:name-assigned` so the Cockpit updates its label.
  *
  * The explicit name IS persisted (decision E only skips the runtime `#N`).
  */
@@ -1461,12 +1461,12 @@ async function _renameAgent(newName) {
         assigned = await _meshNode.rename(newName); // broker soft rejoin
     }
     catch (err) {
-        ctx.ui.notify(`[remote-pi] rename failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] rename failed: ${String(err)}`, "error");
     }
     if (wasStarted && !_disposed)
         await _cmdStart(ctx); // relay back up → roomIdFor(cwd, assigned)
     _pi?.sendMessage({
-        customType: "remote-pi:name-assigned",
+        customType: "remote-omp:name-assigned",
         content: assigned === newName
             ? `Mesh name: ${assigned}`
             : `Mesh name reassigned: "${newName}" → "${assigned}" (collision)`,
@@ -1504,7 +1504,7 @@ export function _onPeerDisconnect(appPeerId) {
     // starts cleanly.
     _currentTurnId = null;
     _refreshFooter();
-    _safeNotify("[remote-pi] All app peers disconnected, listening for reconnect", "info");
+    _safeNotify("[remote-omp] All app peers disconnected, listening for reconnect", "info");
     // Auto-listener stays up — same listener catches the reconnect on any peer.
 }
 /**
@@ -1527,7 +1527,7 @@ function _attachOwner(relay, appPeerId, peerName, firstInner) {
     const channel = new PlainPeerChannel(relay, appPeerId, _myRoomId ?? undefined, (msg) => _routeClientMessageFrom(channel, msg, _liveCtx() ?? _noopCtx), () => _onPeerDisconnect(appPeerId));
     _attachPeerChannel(appPeerId, channel);
     _refreshFooter();
-    _safeNotify(`[remote-pi] Owner attached: peer=${peerShort}, name=${peerName} ` +
+    _safeNotify(`[remote-omp] Owner attached: peer=${peerShort}, name=${peerName} ` +
         `(${_activePeers.size} active)`, "info");
     if (firstInner) {
         // The PlainPeerChannel listener fired on the same line that triggered
@@ -1656,7 +1656,7 @@ async function _handlePairRequest(relay, appPeerId, inner, hasListenerAuthority)
         const code = status === "expired" ? "token_expired"
             : status === "consumed" ? "token_consumed"
                 : "token_unknown";
-        const msg = code === "token_expired" ? "Ephemeral token expired. Generate a new QR with /remote-pi pair."
+        const msg = code === "token_expired" ? "Ephemeral token expired. Generate a new QR with /remote-omp pair."
             : code === "token_consumed" ? "Token already consumed by another pair_request."
                 : "Token was not issued by this Pi.";
         sendError(code, msg);
@@ -1694,7 +1694,7 @@ async function _handlePairRequest(relay, appPeerId, inner, hasListenerAuthority)
         : process.cwd();
     // Prefer the user-configured agent_name (with broker suffix when on the
     // mesh) over the legacy parent/folder path — matches what the user sees
-    // in the terminal title and in /remote-pi status.
+    // in the terminal title and in /remote-omp status.
     const sessionName = _displayName(cwd);
     _attachOwner(relay, appPeerId, inner.device_name);
     sendInner({
@@ -1718,7 +1718,7 @@ async function _handlePairRequest(relay, appPeerId, inner, hasListenerAuthority)
     // close the QR screen and show the new device. Pure data event (display:false)
     // — still emitted to the RPC stdout via the session stream.
     _pi?.sendMessage({
-        customType: "remote-pi:paired",
+        customType: "remote-omp:paired",
         content: `Paired with ${inner.device_name}`,
         details: { name: inner.device_name, peerId: appPeerId, pairedAt },
         display: false,
@@ -1740,9 +1740,9 @@ let _lastCtx = null;
 let _lastEventCtx = null;
 const _noopCtx = { ui: { notify: () => undefined }, abort: () => undefined };
 // A single Pi process can load this extension TWICE in the SAME session:
-// pi-supervisord launches each daemon child as `pi -e <dist>/index.js`, but if
-// remote-pi is ALSO installed as a pi-package (auto-discovered from
-// ~/.pi/agent/extensions or <cwd>/.pi/extensions), Pi loads it a second time
+// omp-supervisord launches each daemon child as `pi -e <dist>/index.js`, but if
+// remote-omp is ALSO installed as a pi-package (auto-discovered from
+// ~/.omp/agent/extensions or <cwd>/.omp/extensions), Pi loads it a second time
 // for that same session. Both loads receive the same session-scoped `pi` and
 // would re-run registerTool/registerCommand for identical names — a hard
 // duplicate-registration conflict that crashes the daemon child on boot (see
@@ -1759,7 +1759,7 @@ const _noopCtx = { ui: { notify: () => undefined }, abort: () => undefined };
 // both module instances resolve the SAME set. Keying weakly by `pi` records the
 // fact without adding a foreign property to the API object and lets each `pi`
 // be GC'd when its session ends (no leak).
-const _APPLIED_REGISTRY_KEY = Symbol.for("remote-pi.extension.appliedRegistry");
+const _APPLIED_REGISTRY_KEY = Symbol.for("remote-omp.extension.appliedRegistry");
 function _appliedRegistry() {
     const g = globalThis;
     return (g[_APPLIED_REGISTRY_KEY] ??= new WeakSet());
@@ -1770,7 +1770,7 @@ const extension = (pi) => {
         return; // this session's pi was already wired
     applied.add(pi);
     _pi = pi;
-    // Plano 19: ensure ~/.pi/remote/{sessions,skills}/ exist and deploy the
+    // Plano 19: ensure ~/.omp/remote/{sessions,skills}/ exist and deploy the
     // agent-network skill on first load. resources_discover lets Pi find it.
     try {
         ensureGlobalDirs();
@@ -2036,9 +2036,9 @@ const extension = (pi) => {
             };
             void _cmdRoot(ctx, restartAuthority);
         }
-        // Auto-start remote-pi on a fresh boot when the cwd's local config has
+        // Auto-start remote-omp on a fresh boot when the cwd's local config has
         // auto_start_relay enabled (default true). Covers BOTH interactive
-        // sessions (previously required typing /remote-pi each session) AND
+        // sessions (previously required typing /remote-omp each session) AND
         // headless daemons. We init here — on session_start — NOT via a
         // factory-return setTimeout(0): the SDK only calls bindCore() (which
         // replaces the throwing action-method stubs like pi.sendMessage) right
@@ -2055,7 +2055,7 @@ const extension = (pi) => {
             // is present at process.cwd()). Interactive: only init when the
             // session_start ctx announces its cwd AND a local config already exists
             // there — never auto-pop the first-run wizard on session_start (a new dir
-            // with no config stays idle until the user runs /remote-pi once). The
+            // with no config stays idle until the user runs /remote-omp once). The
             // cwd guard also keeps tests with a minimal ctx (no cwd) from triggering
             // the wizard path.
             const isDaemon = process.env["REMOTE_PI_DAEMON"] === "1";
@@ -2157,9 +2157,9 @@ const extension = (pi) => {
     // multi-session UDS + granular relay control; in practice every install
     // converged on one session and the relay was always either fully on or
     // fully off. The simplified surface keeps the day-to-day path one-key
-    // (`/remote-pi`) and exposes only the actions that have distinct user
+    // (`/remote-omp`) and exposes only the actions that have distinct user
     // intent: setup, status, stop, pair, devices, revoke, set-relay.
-    pi.registerCommand("remote-pi", {
+    pi.registerCommand("remote-omp", {
         description: "Connect (join local mesh + start relay), or run setup on first use",
         getArgumentCompletions: async (prefix) => {
             if (prefix.startsWith("revoke ") || prefix === "revoke") {
@@ -2173,10 +2173,10 @@ const extension = (pi) => {
                 "set-relay",
                 "peers", // plan/25 Wave D — local + cross-PC inventory
                 "create", "remove", "daemons", // daemon registry (plan/26 W1)
-                // Fleet ops use the `daemon` prefix so `/remote-pi stop` keeps
+                // Fleet ops use the `daemon` prefix so `/remote-omp stop` keeps
                 // meaning "stop this local Pi" — the local UX shipped in plan/25.
                 "daemon start", "daemon stop", "daemon restart",
-                "daemon send", "daemon status",
+                "daemon send", "daemon switch", "daemon status",
                 "cron", "cron add", "cron list", "cron remove", "cron enable", "cron disable", "cron run", "cron log",
                 "install", "uninstall", // service install (plan/26 W3)
             ]
@@ -2240,6 +2240,9 @@ const extension = (pi) => {
             else if (sub.startsWith("daemon send")) {
                 await _cmdDaemonSend(sub.slice("daemon send".length).trim(), ctx);
             }
+            else if (sub.startsWith("daemon switch")) {
+                await _cmdDaemonSwitch(sub.slice("daemon switch".length).trim(), ctx);
+            }
             else if (sub === "cron" || sub.startsWith("cron ")) {
                 await _cmdCron(sub.slice("cron".length).trim(), ctx);
             }
@@ -2255,59 +2258,60 @@ const extension = (pi) => {
         },
     });
     // Nested registrations (one entry per public action). The flat handler
-    // above already routes `/remote-pi <sub>` — these exist for the SDK's
+    // above already routes `/remote-omp <sub>` — these exist for the SDK's
     // command palette and slash-autocomplete in some UI modes.
-    pi.registerCommand("remote-pi setup", { description: "Run the setup wizard and update local config", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdSetup(ctx); } });
-    pi.registerCommand("remote-pi status", { description: "Show local mesh + relay status", handler: async (_, ctx) => { _lastCtx = ctx; _cmdStatus(ctx); } });
-    pi.registerCommand("remote-pi stop", { description: "Stop everything (leave local mesh + disconnect relay)", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdStop(ctx); } });
-    pi.registerCommand("remote-pi pair", { description: "Show a QR code to pair a new mobile device (optional: --ttl <seconds>)", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdPair(ctx, args.trim()); } });
-    pi.registerCommand("remote-pi devices", { description: "List paired mobile devices", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdList(ctx); } });
-    pi.registerCommand("remote-pi rename", { description: "Rename this agent in the current session (updates mesh + relay room)", handler: async (args, ctx) => { _lastCtx = ctx; await _renameAgent(args.trim()); } });
-    pi.registerCommand("remote-pi revoke", {
+    pi.registerCommand("remote-omp setup", { description: "Run the setup wizard and update local config", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdSetup(ctx); } });
+    pi.registerCommand("remote-omp status", { description: "Show local mesh + relay status", handler: async (_, ctx) => { _lastCtx = ctx; _cmdStatus(ctx); } });
+    pi.registerCommand("remote-omp stop", { description: "Stop everything (leave local mesh + disconnect relay)", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdStop(ctx); } });
+    pi.registerCommand("remote-omp pair", { description: "Show a QR code to pair a new mobile device (optional: --ttl <seconds>)", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdPair(ctx, args.trim()); } });
+    pi.registerCommand("remote-omp devices", { description: "List paired mobile devices", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdList(ctx); } });
+    pi.registerCommand("remote-omp rename", { description: "Rename this agent in the current session (updates mesh + relay room)", handler: async (args, ctx) => { _lastCtx = ctx; await _renameAgent(args.trim()); } });
+    pi.registerCommand("remote-omp revoke", {
         description: "Revoke a paired device by its shortid",
         getArgumentCompletions: async (prefix) => _shortidCompletions(prefix),
         handler: async (args, ctx) => { _lastCtx = ctx; await _cmdRevoke(args.trim(), ctx); },
     });
-    pi.registerCommand("remote-pi set-relay", { description: "Persist a new relay URL to user config", handler: async (args, ctx) => { _lastCtx = ctx; _cmdSetRelay(args.trim(), ctx); } });
+    pi.registerCommand("remote-omp set-relay", { description: "Persist a new relay URL to user config", handler: async (args, ctx) => { _lastCtx = ctx; _cmdSetRelay(args.trim(), ctx); } });
     // Plan/25 Wave D
-    pi.registerCommand("remote-pi peers", {
+    pi.registerCommand("remote-omp peers", {
         description: "List local + cross-PC mesh peers, grouped by PC label",
         handler: async (_, ctx) => { _lastCtx = ctx; await _cmdPeers(ctx); },
     });
     // Daemon registry (plan/26 Wave 1) — create + remove. start/stop/send/
     // status/install/uninstall come in later waves with the supervisor.
-    pi.registerCommand("remote-pi create", {
+    pi.registerCommand("remote-omp create", {
         description: "Register a folder as a daemon and start it (when the supervisor is running)",
         handler: async (args, ctx) => { _lastCtx = ctx; await _cmdCreate(args.trim(), ctx); },
     });
-    pi.registerCommand("remote-pi remove", {
+    pi.registerCommand("remote-omp remove", {
         description: "Stop + unregister a daemon by id (local config is preserved)",
         handler: async (args, ctx) => { _lastCtx = ctx; await _cmdRemove(args.trim(), ctx); },
     });
-    // Fleet ops via the supervisor (plan/26 W2). `/remote-pi stop` stays as
-    // local stop — fleet stop is `/remote-pi daemon stop`.
-    pi.registerCommand("remote-pi daemons", { description: "List registered daemons + state", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdDaemonsList(ctx); } });
-    pi.registerCommand("remote-pi daemon start", { description: "Start daemons: all, or one by id (`daemon start <id>`)", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonStart(ctx, args.trim() || undefined); } });
-    pi.registerCommand("remote-pi daemon stop", { description: "Stop daemons: all, or one by id (`daemon stop <id>`)", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonStop(ctx, args.trim() || undefined); } });
-    pi.registerCommand("remote-pi daemon restart", { description: "Restart daemons: all, or one by id (`daemon restart <id>`)", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonRestart(ctx, args.trim() || undefined); } });
-    pi.registerCommand("remote-pi daemon status", { description: "Show fleet runtime status (pid, uptime, restarts)", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdDaemonStatus(ctx); } });
-    pi.registerCommand("remote-pi daemon send", { description: "Send a prompt to a daemon: `daemon send <id> \"<text>\"`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonSend(args.trim(), ctx); } });
-    pi.registerCommand("remote-pi cron", { description: "Schedule recurring prompts to daemons: `cron <add|list|remove|enable|disable|run|log>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdCron(args.trim(), ctx); } });
+    // Fleet ops via the supervisor (plan/26 W2). `/remote-omp stop` stays as
+    // local stop — fleet stop is `/remote-omp daemon stop`.
+    pi.registerCommand("remote-omp daemons", { description: "List registered daemons + state", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdDaemonsList(ctx); } });
+    pi.registerCommand("remote-omp daemon start", { description: "Start daemons: all, or one by id (`daemon start <id>`)", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonStart(ctx, args.trim() || undefined); } });
+    pi.registerCommand("remote-omp daemon stop", { description: "Stop daemons: all, or one by id (`daemon stop <id>`)", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonStop(ctx, args.trim() || undefined); } });
+    pi.registerCommand("remote-omp daemon restart", { description: "Restart daemons: all, or one by id (`daemon restart <id>`)", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonRestart(ctx, args.trim() || undefined); } });
+    pi.registerCommand("remote-omp daemon status", { description: "Show fleet runtime status (pid, uptime, restarts)", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdDaemonStatus(ctx); } });
+    pi.registerCommand("remote-omp daemon send", { description: "Send a prompt to a daemon: `daemon send <id> \"<text>\"`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonSend(args.trim(), ctx); } });
+    pi.registerCommand("remote-omp daemon switch", { description: "Switch a daemon to a different session: `daemon switch <id> <sessionPath>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonSwitch(args.trim(), ctx); } });
+    pi.registerCommand("remote-omp cron", { description: "Schedule recurring prompts to daemons: `cron <add|list|remove|enable|disable|run|log>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdCron(args.trim(), ctx); } });
     // Service install / uninstall (plan/26 W3)
-    pi.registerCommand("remote-pi install", { description: "Install pi-supervisord as a system service + link the remote-pi CLI (systemd/launchd/Task Scheduler; Windows prompts for admin)", handler: async (_, ctx) => { _lastCtx = ctx; _cmdInstall(ctx, { linkCli: true }); } });
-    pi.registerCommand("remote-pi uninstall", { description: "Remove the pi-supervisord system service + the CLI shims (daemons registry preserved; Windows prompts for admin)", handler: async (_, ctx) => { _lastCtx = ctx; _cmdUninstall(ctx, { linkCli: true }); } });
+    pi.registerCommand("remote-omp install", { description: "Install omp-supervisord as a system service + link the remote-omp CLI (systemd/launchd/Task Scheduler; Windows prompts for admin)", handler: async (_, ctx) => { _lastCtx = ctx; _cmdInstall(ctx, { linkCli: true }); } });
+    pi.registerCommand("remote-omp uninstall", { description: "Remove the omp-supervisord system service + the CLI shims (daemons registry preserved; Windows prompts for admin)", handler: async (_, ctx) => { _lastCtx = ctx; _cmdUninstall(ctx, { linkCli: true }); } });
     // Auto-init now runs from the session_start handler (above), AFTER the
     // SDK calls bindCore(). The original setTimeout(0) here fired before bindCore
     // replaced the throwing action-method stubs, so the first pi.sendMessage in
     // _emitRelayState crashed the headless pi process with "Extension runtime not
     // initialized" in a 5s supervisor crash-loop. The session_start handler now
     // auto-starts for ANY session with auto_start_relay (default true), so new
-    // interactive pi sessions are on remote automatically — no /remote-pi needed.
+    // interactive pi sessions are on remote automatically — no /remote-omp needed.
 };
 export default extension;
 // ── Command implementations ───────────────────────────────────────────────────
 /**
- * `/remote-pi status` — full state snapshot. Two lines: local mesh + relay.
+ * `/remote-omp status` — full state snapshot. Two lines: local mesh + relay.
  *
  * Always callable; safe when nothing is up (renders the off variants).
  * Reuses the same icons as the footer so terminal + status output stay
@@ -2327,7 +2331,7 @@ function _cmdStatus(ctx) {
     // Relay line — paired state is derived from _activePeers.size now.
     let relayLine;
     if (_state === "idle") {
-        relayLine = `⚪ Relay: off (${relayUrl}) — run /remote-pi to start`;
+        relayLine = `⚪ Relay: off (${relayUrl}) — run /remote-omp to start`;
     }
     else if (_activePeers.size > 0) {
         const count = _activePeers.size;
@@ -2339,10 +2343,10 @@ function _cmdStatus(ctx) {
             ? `🟢 Relay: on, waiting for an app to connect (${relayUrl})`
             : `🟡 Relay: on, waiting for first pairing (${relayUrl})`;
     }
-    ctx.ui.notify(`[remote-pi]\n  ${meshLine}\n  ${relayLine}`, "info");
+    ctx.ui.notify(`[remote-omp]\n  ${meshLine}\n  ${relayLine}`, "info");
 }
 /**
- * Plan/25 Wave D: `/remote-pi peers`.
+ * Plan/25 Wave D: `/remote-omp peers`.
  *
  * Queries the local broker for the aggregated peer inventory (`list_peers`
  * returns locals + cross-PC entries prefixed with `<pc_label>:`). Formats
@@ -2351,7 +2355,7 @@ function _cmdStatus(ctx) {
  */
 async function _cmdPeers(ctx) {
     if (!_meshNode) {
-        ctx.ui.notify("[remote-pi] Not on the local mesh. Run /remote-pi to join.", "warning");
+        ctx.ui.notify("[remote-omp] Not on the local mesh. Run /remote-omp to join.", "warning");
         return;
     }
     let peers;
@@ -2360,20 +2364,20 @@ async function _cmdPeers(ctx) {
         peers = reply.body?.peers ?? [];
     }
     catch (err) {
-        ctx.ui.notify(`[remote-pi] peers list failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] peers list failed: ${String(err)}`, "error");
         return;
     }
     // Exclude self from the printed list — `list_peers` returns every peer
     // registered with the broker including the caller, which is noise here.
     const selfName = _meshNode.name();
-    ctx.ui.notify(`[remote-pi] peers:\n${formatPeerInventory(peers, selfName)}`, "info");
+    ctx.ui.notify(`[remote-omp] peers:\n${formatPeerInventory(peers, selfName)}`, "info");
 }
 /**
- * Root handler for `/remote-pi`. On first run (no local config) drops into
+ * Root handler for `/remote-omp`. On first run (no local config) drops into
  * the wizard; on subsequent runs auto-joins the local mesh + starts the
  * relay (if opted in during setup), then prints the status.
  *
- * `/remote-pi` is intentionally the only command users need day-to-day:
+ * `/remote-omp` is intentionally the only command users need day-to-day:
  * idempotent connect + status display.
  */
 async function _cmdRoot(ctx, restartAuthority) {
@@ -2451,8 +2455,8 @@ async function _cmdRootInner(ctx, rootLifecycleGeneration) {
             if (!_isCurrentRootLifecycle(rootLifecycleGeneration))
                 return;
             ctx.ui.notify(process.env["REMOTE_PI_DAEMON"] === "1"
-                ? `[remote-pi] Daemon not started: another live agent already owns "${requestedName}" in this folder. Stop the old Pi process, then restart the daemon.`
-                : `[remote-pi] Could not start: too many agents named "${requestedName}" already running in this folder.`, "warning");
+                ? `[remote-omp] Daemon not started: another live agent already owns "${requestedName}" in this folder. Stop the old Pi process, then restart the daemon.`
+                : `[remote-omp] Could not start: too many agents named "${requestedName}" already running in this folder.`, "warning");
             return;
         }
     }
@@ -2471,11 +2475,11 @@ async function _cmdRootInner(ctx, rootLifecycleGeneration) {
         if (!_isCurrentRootLifecycle(rootLifecycleGeneration))
             return;
         if (!newConfig) {
-            ctx.ui.notify("[remote-pi] Setup cancelled.", "info");
+            ctx.ui.notify("[remote-omp] Setup cancelled.", "info");
             return;
         }
         saveLocalConfig(cwd, newConfig);
-        ctx.ui.notify(`[remote-pi] Config saved to ${cwd}/.pi/remote-pi/config.json`, "info");
+        ctx.ui.notify(`[remote-omp] Config saved to ${cwd}/.omp/remote-omp/config.json`, "info");
         if (!_isCurrentRootLifecycle(rootLifecycleGeneration))
             return;
         await _cmdJoin(ctx);
@@ -2509,14 +2513,14 @@ async function _cmdRootInner(ctx, rootLifecycleGeneration) {
     _cmdStatus(ctx);
 }
 /**
- * `/remote-pi setup` — re-run the wizard. Defaults pre-fill from the
+ * `/remote-omp setup` — re-run the wizard. Defaults pre-fill from the
  * existing config so it doubles as an "edit" flow.
  */
 async function _cmdSetup(ctx) {
     const cwd = "cwd" in ctx ? ctx.cwd : process.cwd();
     const ui = ctx.ui;
     if (typeof ui.select !== "function") {
-        ctx.ui.notify("[remote-pi] Setup requires an interactive UI.", "warning");
+        ctx.ui.notify("[remote-omp] Setup requires an interactive UI.", "warning");
         return;
     }
     const current = loadLocalConfig(cwd);
@@ -2526,15 +2530,15 @@ async function _cmdSetup(ctx) {
         use_relay: effectiveAutoStartRelay(current),
     });
     if (!newConfig) {
-        ctx.ui.notify("[remote-pi] Setup cancelled.", "info");
+        ctx.ui.notify("[remote-omp] Setup cancelled.", "info");
         return;
     }
     saveLocalConfig(cwd, newConfig);
-    ctx.ui.notify("[remote-pi] Config updated. Run /remote-pi to apply now.", "info");
+    ctx.ui.notify("[remote-omp] Config updated. Run /remote-omp to apply now.", "info");
 }
 async function _cmdStart(ctx) {
     if (_state !== "idle") {
-        ctx.ui.notify("[remote-pi] Already started.", "warning");
+        ctx.ui.notify("[remote-omp] Already started.", "warning");
         return;
     }
     const lifecycleGeneration = ++_relayLifecycleGeneration;
@@ -2558,9 +2562,9 @@ async function _cmdStart(ctx) {
             // to mint a new key (that's what silently broke pairing after idle), so
             // abort cleanly with an actionable message instead of crashing or
             // re-pairing. Unlocking the keychain and re-running fixes it.
-            ctx.ui.notify("[remote-pi] Could not read this machine's identity: the system " +
+            ctx.ui.notify("[remote-omp] Could not read this machine's identity: the system " +
                 "keychain is locked or access was denied. Unlock it (open the app / " +
-                "log in) and run /remote-pi again. Your pairing is NOT lost. " +
+                "log in) and run /remote-omp again. Your pairing is NOT lost. " +
                 "(Set REMOTE_PI_ALLOW_FILE_IDENTITY=1 only for headless hosts.)", "error");
             return;
         }
@@ -2598,7 +2602,7 @@ async function _cmdStart(ctx) {
             // Pi. For a HEADLESS DAEMON both are undefined at connect: the SDK only
             // resolves `this.model` lazily at the first turn, and `model_select`
             // never fires for a default-model session. So fall back to the CONFIGURED
-            // default (defaultProvider/defaultModel in <cwd>/.pi/settings.json) — the
+            // default (defaultProvider/defaultModel in <cwd>/.omp/settings.json) — the
             // model the daemon will actually use. Without this an idle daemon (never
             // prompted → no turn) would never report its model and the app shows
             // "unknown". turn_start still hydrates a later override.
@@ -2626,7 +2630,7 @@ async function _cmdStart(ctx) {
     try {
         _currentThinking = _pi?.getThinkingLevel();
     }
-    catch { /* defensive — never block /remote-pi start on this */ }
+    catch { /* defensive — never block /remote-omp start on this */ }
     const roomMeta = { name: sessionName, cwd };
     const modelName = _currentModelName();
     if (modelName)
@@ -2637,7 +2641,7 @@ async function _cmdStart(ctx) {
     // this, reconnect issues a bare hello and the relay creates a "default room"
     // entry that surfaces in the app as a phantom legacy session.
     _myRoomMeta = roomMeta;
-    ctx.ui.notify(`[remote-pi] Connecting to relay ${relayUrl} (source: ${source}, room: ${roomId})…`, "info");
+    ctx.ui.notify(`[remote-omp] Connecting to relay ${relayUrl} (source: ${source}, room: ${roomId})…`, "info");
     // Transport opens WebSocket; convert the canonical http(s):// stored
     // form to ws(s):// at this boundary. The relayUrl variable keeps the
     // http(s):// form for logging + mesh client construction below.
@@ -2658,10 +2662,10 @@ async function _cmdStart(ctx) {
         if (!isCurrentCandidate())
             return;
         if (err instanceof RoomAlreadyOpenError) {
-            ctx.ui.notify("[remote-pi] Already running in this cwd. Stop the other terminal first.", "error");
+            ctx.ui.notify("[remote-omp] Already running in this cwd. Stop the other terminal first.", "error");
             return;
         }
-        ctx.ui.notify(`[remote-pi] relay connect failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] relay connect failed: ${String(err)}`, "error");
         return;
     }
     // The candidate is local until this publication point. Session shutdown,
@@ -2679,7 +2683,7 @@ async function _cmdStart(ctx) {
     _peerShort = myShort;
     _myRoomId = roomId;
     _state = "started";
-    // Set _sessionStartedAt ONLY on first /remote-pi start since process boot.
+    // Set _sessionStartedAt ONLY on first /remote-omp start since process boot.
     // Subsequent start cycles (after stop) preserve the original epoch so the
     // app keeps treating it as the same session (and merges new events from
     // the terminal turns that happened during the idle window). Pi process
@@ -2765,34 +2769,34 @@ async function _cmdStart(ctx) {
     if (!createdProducer)
         _attachBridgeIfReady();
     _emitRelayState(); // → connected
-    ctx.ui.notify(`[remote-pi] state: started (peer=${myShort}) — Connected to relay ${relayUrl}`, "info");
+    ctx.ui.notify(`[remote-omp] state: started (peer=${myShort}) — Connected to relay ${relayUrl}`, "info");
 }
 /**
- * `/remote-pi pair` — always generates a fresh QR when the relay is up.
+ * `/remote-omp pair` — always generates a fresh QR when the relay is up.
  *
  * Pre-W2D this rejected with "Already paired with X" once one owner was
- * connected, forcing /remote-pi stop to pair a second device — the
+ * connected, forcing /remote-omp stop to pair a second device — the
  * catch-22 the multi-channel refactor was designed to break. Now the new
  * device is **added** to `_activePeers` after scanning, while existing
  * owners keep their session.
  */
 async function _cmdPair(ctx, args = "") {
     const cwd = "cwd" in ctx ? ctx.cwd : "";
-    // Auto-bootstrap when services are down. Before this, `/remote-pi pair`
-    // on a fresh terminal forced the user to call `/remote-pi` first — every
+    // Auto-bootstrap when services are down. Before this, `/remote-omp pair`
+    // on a fresh terminal forced the user to call `/remote-omp` first — every
     // session began with the same surprise warning + second command. Now we
     // do the join + relay-start inline so the common "I just opened a
     // terminal and want to pair my phone" flow is a single command.
     //
     // We don't run the first-time wizard here: pair is a focused operation
     // and the wizard prompts are wrong UX in that flow. If there's no local
-    // config, the user truly needs to run `/remote-pi` first to configure.
+    // config, the user truly needs to run `/remote-omp` first to configure.
     if (_state === "idle") {
         if (!localConfigExists(cwd)) {
-            ctx.ui.notify("[remote-pi] First-time setup needed. Run /remote-pi to configure, then /remote-pi pair.", "warning");
+            ctx.ui.notify("[remote-omp] First-time setup needed. Run /remote-omp to configure, then /remote-omp pair.", "warning");
             return;
         }
-        ctx.ui.notify("[remote-pi] Starting mesh + relay before pairing…", "info");
+        ctx.ui.notify("[remote-omp] Starting mesh + relay before pairing…", "info");
         if (!_meshNode)
             await _cmdJoin(ctx);
         if (_state === "idle")
@@ -2801,8 +2805,8 @@ async function _cmdPair(ctx, args = "") {
     // Relay must be up — the QR carries a token the app exchanges through
     // the relay. Without a live WS there's nothing for the scan to land on.
     if (_state === "idle" || !_relay) {
-        ctx.ui.notify("[remote-pi] Pair requires the relay to be connected. " +
-            "Run /remote-pi to start it (or fix your relay URL via /remote-pi set-relay).", "warning");
+        ctx.ui.notify("[remote-omp] Pair requires the relay to be connected. " +
+            "Run /remote-omp to start it (or fix your relay URL via /remote-omp set-relay).", "warning");
         return;
     }
     const edKp = _cachedEd25519;
@@ -2828,7 +2832,7 @@ async function _cmdPair(ctx, args = "") {
     if (_pi) {
         const qrAscii = renderQRAscii(qrUri);
         _pi.sendMessage({
-            customType: "remote-pi:pair-code",
+            customType: "remote-omp:pair-code",
             content: `📱 Scan to pair:\n\n${qrAscii}\n` +
                 `📋 Or copy this pairing code (camera-less devices):\n\n${qrUri}`,
             // Structured payload for RPC clients (e.g. Cockpit): render their own QR
@@ -2837,14 +2841,14 @@ async function _cmdPair(ctx, args = "") {
             display: true,
         });
     }
-    ctx.ui.notify(`[remote-pi] QR ready — valid until ${new Date(expiresAt).toLocaleTimeString()}. ` +
+    ctx.ui.notify(`[remote-omp] QR ready — valid until ${new Date(expiresAt).toLocaleTimeString()}. ` +
         `Scan with the app, or copy the pairing code printed above.`, "info");
     // Returns immediately; the auto-listener transitions to 'paired' on pair_request.
 }
 /**
- * `/remote-pi stop` — full teardown. Leaves the local UDS mesh AND closes
+ * `/remote-omp stop` — full teardown. Leaves the local UDS mesh AND closes
  * the relay. Safe when one or both are already off. To resume, run
- * `/remote-pi` again.
+ * `/remote-omp` again.
  */
 async function _cmdStop(ctx) {
     // Invalidate queued root work and local async candidates even when none has
@@ -2855,7 +2859,7 @@ async function _cmdStop(ctx) {
     const relayUp = _state !== "idle";
     if (!meshUp && !relayUp) {
         _relayLifecycleGeneration += 1;
-        ctx.ui.notify("[remote-pi] Already stopped — nothing to do.", "info");
+        ctx.ui.notify("[remote-omp] Already stopped — nothing to do.", "info");
         return;
     }
     // Preserve bye ordering, but revoke Relay/SelfRevoke/bridge authority while
@@ -2880,13 +2884,13 @@ async function _cmdStop(ctx) {
         await meshClose;
     }
     catch { /* best-effort */ }
-    ctx.ui.notify("[remote-pi] Stopped (mesh + relay disconnected).", "info");
+    ctx.ui.notify("[remote-omp] Stopped (mesh + relay disconnected).", "info");
     _refreshFooter(ctx);
 }
 async function _cmdList(ctx) {
     const peers = await listPeers();
     if (peers.length === 0) {
-        ctx.ui.notify("[remote-pi] No paired devices.", "info");
+        ctx.ui.notify("[remote-omp] No paired devices.", "info");
         return;
     }
     // Multi-channel (W2D): each peer is either `online` (channel attached
@@ -2901,12 +2905,12 @@ async function _cmdList(ctx) {
             : " ⚪ offline";
         return `• ${inspected.rawHandle.slice(0, 8)} — ${inspected.record.name}${tag}`;
     }).join("\n");
-    ctx.ui.notify(`[remote-pi] Paired devices:\n${lines}`, "info");
+    ctx.ui.notify(`[remote-omp] Paired devices:\n${lines}`, "info");
 }
 async function _cmdRevoke(arg, ctx) {
     const shortid = arg.trim();
     if (!shortid) {
-        ctx.ui.notify("[remote-pi] Usage: /remote-pi revoke <shortid>. Run /remote-pi list to see shortids.", "warning");
+        ctx.ui.notify("[remote-omp] Usage: /remote-omp revoke <shortid>. Run /remote-omp list to see shortids.", "warning");
         return;
     }
     // Revoke needs the relay so the revoked device gets a `bye` and its live
@@ -2915,18 +2919,18 @@ async function _cmdRevoke(arg, ctx) {
     const cwd = "cwd" in ctx ? ctx.cwd : "";
     if (_state === "idle") {
         if (!localConfigExists(cwd)) {
-            ctx.ui.notify("[remote-pi] First-time setup needed. Run /remote-pi to configure, then /remote-pi revoke.", "warning");
+            ctx.ui.notify("[remote-omp] First-time setup needed. Run /remote-omp to configure, then /remote-omp revoke.", "warning");
             return;
         }
-        ctx.ui.notify("[remote-pi] Starting mesh + relay before revoking…", "info");
+        ctx.ui.notify("[remote-omp] Starting mesh + relay before revoking…", "info");
         if (!_meshNode)
             await _cmdJoin(ctx);
         if (_state === "idle")
             await _cmdStart(ctx);
     }
     if (_state === "idle" || !_relay) {
-        ctx.ui.notify("[remote-pi] Revoke requires the relay to be connected. " +
-            "Run /remote-pi to start it (or fix your relay URL via /remote-pi set-relay).", "warning");
+        ctx.ui.notify("[remote-omp] Revoke requires the relay to be connected. " +
+            "Run /remote-omp to start it (or fix your relay URL via /remote-omp set-relay).", "warning");
         return;
     }
     const matches = (await listPeers())
@@ -2934,12 +2938,12 @@ async function _cmdRevoke(arg, ctx) {
         .filter((peer) => peer !== null)
         .filter((peer) => peer.rawHandle.startsWith(shortid));
     if (matches.length === 0) {
-        ctx.ui.notify("[remote-pi] No peer matching that shortid. Run /remote-pi devices to see shortids.", "warning");
+        ctx.ui.notify("[remote-omp] No peer matching that shortid. Run /remote-omp devices to see shortids.", "warning");
         return;
     }
     if (matches.length > 1) {
         const collisions = matches.map((peer) => peer.rawHandle.slice(0, 8)).join(", ");
-        ctx.ui.notify(`[remote-pi] Ambiguous shortid — ${matches.length} matches: ${collisions}. Use mais chars.`, "warning");
+        ctx.ui.notify(`[remote-omp] Ambiguous shortid — ${matches.length} matches: ${collisions}. Use mais chars.`, "warning");
         return;
     }
     const peer = matches[0];
@@ -2956,7 +2960,7 @@ async function _cmdRevoke(arg, ctx) {
         _detachPeerChannel(peer.runtimeKey);
         _refreshFooter();
     }
-    ctx.ui.notify(`[remote-pi] Revoked: ${peer.record.name} (${peer.rawHandle.slice(0, 8)}…)`, "info");
+    ctx.ui.notify(`[remote-omp] Revoked: ${peer.record.name} (${peer.rawHandle.slice(0, 8)}…)`, "info");
 }
 async function _shortidCompletions(prefix, valuePrefix = "") {
     const peers = (await listPeers())
@@ -2976,31 +2980,31 @@ async function _shortidCompletions(prefix, valuePrefix = "") {
 function _cmdSetRelay(arg, ctx) {
     const raw = arg.trim();
     if (!raw) {
-        ctx.ui.notify("[remote-pi] Usage: /remote-pi set-relay <http:// or https:// url>", "warning");
+        ctx.ui.notify("[remote-omp] Usage: /remote-omp set-relay <http:// or https:// url>", "warning");
         return;
     }
     if (isWebSocketScheme(raw)) {
-        ctx.ui.notify(`[remote-pi] Use http:// or https://. The extension converts to WebSocket automatically.`, "error");
+        ctx.ui.notify(`[remote-omp] Use http:// or https://. The extension converts to WebSocket automatically.`, "error");
         return;
     }
     if (!isValidRelayUrl(raw)) {
-        ctx.ui.notify(`[remote-pi] Invalid URL: ${raw}. Must start with http:// or https://`, "error");
+        ctx.ui.notify(`[remote-omp] Invalid URL: ${raw}. Must start with http:// or https://`, "error");
         return;
     }
     saveConfig({ relay: raw });
-    ctx.ui.notify(`[remote-pi] Relay set to ${raw}. Run /remote-pi start (or restart) to apply.`, "info");
+    ctx.ui.notify(`[remote-omp] Relay set to ${raw}. Run /remote-omp start (or restart) to apply.`, "info");
 }
 // ── Daemon registry commands (plan/26 Wave 1) ─────────────────────────────────
 /**
- * `/remote-pi create [<cwd>] [--name <name>]`
+ * `/remote-omp create [<cwd>] [--name <name>]`
  *
- * Promotes a folder to a daemon entry in `~/.pi/remote/daemons.json`. The
+ * Promotes a folder to a daemon entry in `~/.omp/remote/daemons.json`. The
  * cwd is **always normalized to an absolute realpath** before storage —
  * `~/Movies`, `./Movies`, `../foo/Movies` all collapse to a single
  * canonical entry. Relative paths resolve against the Pi process's
  * current working directory, not the slash-command's `ctx.cwd`.
  *
- * Side effects on the cwd's local config (`<cwd>/.pi/remote-pi/config.json`):
+ * Side effects on the cwd's local config (`<cwd>/.omp/remote-omp/config.json`):
  *   - If the config doesn't exist: created with `auto_start_relay=true`
  *     (mandatory for daemons) and `agent_name` from `--name` if provided.
  *   - If the config already exists: left untouched. Re-running `create`
@@ -3015,7 +3019,7 @@ async function _cmdCreate(arg, ctx) {
     const name = nameMatch ? (nameMatch[1] ?? nameMatch[2]) : undefined;
     const cwdRaw = arg.replace(/--name\s+"[^"]+"|--name\s+\S+/, "").trim();
     if (!cwdRaw) {
-        ctx.ui.notify("[remote-pi] Usage: /remote-pi create <absolute-or-relative-cwd> [--name \"Display name\"]", "warning");
+        ctx.ui.notify("[remote-omp] Usage: /remote-omp create <absolute-or-relative-cwd> [--name \"Display name\"]", "warning");
         return;
     }
     let result;
@@ -3023,14 +3027,14 @@ async function _cmdCreate(arg, ctx) {
         result = addDaemon(cwdRaw, name);
     }
     catch (err) {
-        ctx.ui.notify(`[remote-pi] create failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] create failed: ${String(err)}`, "error");
         return;
     }
-    // No local `.pi/remote-pi/config.json` is written anymore — the name lives
+    // No local `.omp/remote-omp/config.json` is written anymore — the name lives
     // in the registry and the supervisor injects the full config (agent_name,
     // auto_start_relay true) via REMOTE_PI_DIRECT_CONFIG when it spawns the
     // daemon. The cwd needs no init folder.
-    ctx.ui.notify(`[remote-pi] Daemon registered: id=${result.id} name="${result.name}" cwd=${result.cwd}`, "info");
+    ctx.ui.notify(`[remote-omp] Daemon registered: id=${result.id} name="${result.name}" cwd=${result.cwd}`, "info");
     // Auto-start: register alone used to leave the daemon idle until the next
     // supervisor restart (the reported bug — `create` didn't run anything). Ask
     // the supervisor to spawn THIS daemon now; it reads the name from the
@@ -3039,29 +3043,29 @@ async function _cmdCreate(arg, ctx) {
     // registration and tell the user it'll boot on the next supervisor start.
     try {
         await callSupervisor({ op: "start", id: result.id });
-        ctx.ui.notify(`[remote-pi] Daemon started: id=${result.id}`, "info");
+        ctx.ui.notify(`[remote-omp] Daemon started: id=${result.id}`, "info");
     }
     catch (err) {
         if (err instanceof SupervisorOfflineError) {
-            ctx.ui.notify(`[remote-pi] Registered, but the supervisor is offline — not running yet. ` +
-                `Run \`remote-pi install\` (or start \`pi-supervisord\`); it auto-starts on the next supervisor boot.`, "warning");
+            ctx.ui.notify(`[remote-omp] Registered, but the supervisor is offline — not running yet. ` +
+                `Run \`remote-omp install\` (or start \`omp-supervisord\`); it auto-starts on the next supervisor boot.`, "warning");
             return;
         }
-        ctx.ui.notify(`[remote-pi] Registered, but auto-start failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] Registered, but auto-start failed: ${String(err)}`, "error");
     }
 }
 /**
- * `/remote-pi remove <id>`
+ * `/remote-omp remove <id>`
  *
  * Unregisters a daemon by its 8-hex-char id (the same id printed by
- * `/remote-pi create` and `/remote-pi daemons`). The cwd's local config
+ * `/remote-omp create` and `/remote-omp daemons`). The cwd's local config
  * stays on disk — re-creating later with the same cwd is a no-op
  * because the existing config wins.
  */
 async function _cmdRemove(arg, ctx) {
     const id = arg.trim();
     if (!id) {
-        ctx.ui.notify("[remote-pi] Usage: /remote-pi remove <id>. Run /remote-pi daemons to see ids.", "warning");
+        ctx.ui.notify("[remote-omp] Usage: /remote-omp remove <id>. Run /remote-omp daemons to see ids.", "warning");
         return;
     }
     // Prefer the supervisor's `unregister`: it STOPS the running child (SIGTERM →
@@ -3073,16 +3077,16 @@ async function _cmdRemove(arg, ctx) {
         const data = await callSupervisor({ op: "unregister", id });
         if (!data.removed) {
             const known = listDaemons().map((d) => d.id).join(", ") || "(none)";
-            ctx.ui.notify(`[remote-pi] No daemon with id "${id}". Known ids: ${known}`, "warning");
+            ctx.ui.notify(`[remote-omp] No daemon with id "${id}". Known ids: ${known}`, "warning");
             return;
         }
-        ctx.ui.notify(`[remote-pi] Daemon removed + process stopped: id=${id} cwd=${data.cwd}. ` +
-            `Local config at ${data.cwd}/.pi/remote-pi/config.json was kept.`, "info");
+        ctx.ui.notify(`[remote-omp] Daemon removed + process stopped: id=${id} cwd=${data.cwd}. ` +
+            `Local config at ${data.cwd}/.omp/remote-omp/config.json was kept.`, "info");
         return;
     }
     catch (err) {
         if (!(err instanceof SupervisorOfflineError)) {
-            ctx.ui.notify(`[remote-pi] remove failed: ${String(err)}`, "error");
+            ctx.ui.notify(`[remote-omp] remove failed: ${String(err)}`, "error");
             return;
         }
         // Supervisor offline — fall through to registry-only removal below.
@@ -3092,15 +3096,15 @@ async function _cmdRemove(arg, ctx) {
         result = removeDaemon(id);
     }
     catch (err) {
-        ctx.ui.notify(`[remote-pi] remove failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] remove failed: ${String(err)}`, "error");
         return;
     }
     if (!result.removed) {
         const known = listDaemons().map((d) => d.id).join(", ") || "(none)";
-        ctx.ui.notify(`[remote-pi] No daemon with id "${id}". Known ids: ${known}`, "warning");
+        ctx.ui.notify(`[remote-omp] No daemon with id "${id}". Known ids: ${known}`, "warning");
         return;
     }
-    ctx.ui.notify(`[remote-pi] Daemon removed from registry: id=${id} cwd=${result.cwd}. ` +
+    ctx.ui.notify(`[remote-omp] Daemon removed from registry: id=${id} cwd=${result.cwd}. ` +
         `Supervisor was offline, so any running process was NOT stopped. Local config kept.`, "warning");
 }
 // ── Fleet-ops commands (plan/26 W2) — talk to the supervisor over UDS ─────────
@@ -3109,7 +3113,7 @@ async function _cmdRemove(arg, ctx) {
 // the supervisor isn't running we fall back to a friendly hint instead of
 // the raw error, so the user can't get stuck on "what's wrong?".
 function _notifyOffline(ctx, err) {
-    ctx.ui.notify(`[remote-pi] ${err.message}`, "warning");
+    ctx.ui.notify(`[remote-omp] ${err.message}`, "warning");
 }
 function _formatDaemonTable(daemons) {
     if (daemons.length === 0)
@@ -3123,7 +3127,7 @@ function _formatDaemonTable(daemons) {
     return rows.join("\n");
 }
 /**
- * `/remote-pi daemons` — registry + runtime state in one view. When the
+ * `/remote-omp daemons` — registry + runtime state in one view. When the
  * supervisor is offline we still show registry-only output (state =
  * "stopped" everywhere), so the user can see what's configured even
  * before `install`.
@@ -3132,7 +3136,7 @@ async function _cmdDaemonsList(ctx) {
     if (!(await supervisorOnline())) {
         const registry = listDaemons();
         if (registry.length === 0) {
-            ctx.ui.notify("[remote-pi] No daemons registered. Run /remote-pi create <cwd>.", "info");
+            ctx.ui.notify("[remote-omp] No daemons registered. Run /remote-omp create <cwd>.", "info");
             return;
         }
         const rows = registry.map((d) => {
@@ -3140,32 +3144,32 @@ async function _cmdDaemonsList(ctx) {
             const name = cfg.agent_name ?? defaultAgentName(d.cwd);
             return `  ${d.id}  ${name}  ${d.cwd}  (supervisor offline)`;
         }).join("\n");
-        ctx.ui.notify(`[remote-pi] Daemons (registry only — run install to bring supervisor up):\n${rows}`, "info");
+        ctx.ui.notify(`[remote-omp] Daemons (registry only — run install to bring supervisor up):\n${rows}`, "info");
         return;
     }
     try {
         const data = await callSupervisor({ op: "list" });
-        ctx.ui.notify(`[remote-pi] Daemons:\n${_formatDaemonTable(data.daemons)}`, "info");
+        ctx.ui.notify(`[remote-omp] Daemons:\n${_formatDaemonTable(data.daemons)}`, "info");
     }
     catch (err) {
         if (err instanceof SupervisorOfflineError) {
             _notifyOffline(ctx, err);
             return;
         }
-        ctx.ui.notify(`[remote-pi] daemons failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] daemons failed: ${String(err)}`, "error");
     }
 }
 async function _cmdDaemonStatus(ctx) {
     try {
         const data = await callSupervisor({ op: "status" });
-        ctx.ui.notify(`[remote-pi] Fleet status:\n${_formatDaemonTable(data.daemons)}`, "info");
+        ctx.ui.notify(`[remote-omp] Fleet status:\n${_formatDaemonTable(data.daemons)}`, "info");
     }
     catch (err) {
         if (err instanceof SupervisorOfflineError) {
             _notifyOffline(ctx, err);
             return;
         }
-        ctx.ui.notify(`[remote-pi] status failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] status failed: ${String(err)}`, "error");
     }
 }
 async function _cmdDaemonStart(ctx, id) {
@@ -3173,12 +3177,12 @@ async function _cmdDaemonStart(ctx, id) {
         if (id) {
             const data = await callSupervisor({ op: "start", id });
             ctx.ui.notify(data.started
-                ? `[remote-pi] Started daemon ${id} (${data.state}).`
-                : `[remote-pi] Daemon ${id} already ${data.state}.`, "info");
+                ? `[remote-omp] Started daemon ${id} (${data.state}).`
+                : `[remote-omp] Daemon ${id} already ${data.state}.`, "info");
             return;
         }
         const data = await callSupervisor({ op: "start_all" });
-        ctx.ui.notify(`[remote-pi] Started ${data.started.length} daemon(s), ` +
+        ctx.ui.notify(`[remote-omp] Started ${data.started.length} daemon(s), ` +
             `${data.already_running.length} already running.`, "info");
     }
     catch (err) {
@@ -3186,7 +3190,7 @@ async function _cmdDaemonStart(ctx, id) {
             _notifyOffline(ctx, err);
             return;
         }
-        ctx.ui.notify(`[remote-pi] start failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] start failed: ${String(err)}`, "error");
     }
 }
 async function _cmdDaemonStop(ctx, id) {
@@ -3194,12 +3198,12 @@ async function _cmdDaemonStop(ctx, id) {
         if (id) {
             const data = await callSupervisor({ op: "stop", id });
             ctx.ui.notify(data.stopped
-                ? `[remote-pi] Stopped daemon ${id}.`
-                : `[remote-pi] Daemon ${id} already ${data.state}.`, "info");
+                ? `[remote-omp] Stopped daemon ${id}.`
+                : `[remote-omp] Daemon ${id} already ${data.state}.`, "info");
             return;
         }
         const data = await callSupervisor({ op: "stop_all" });
-        ctx.ui.notify(`[remote-pi] Stopped ${data.stopped.length} daemon(s), ` +
+        ctx.ui.notify(`[remote-omp] Stopped ${data.stopped.length} daemon(s), ` +
             `${data.already_stopped.length} already stopped.`, "info");
     }
     catch (err) {
@@ -3207,29 +3211,29 @@ async function _cmdDaemonStop(ctx, id) {
             _notifyOffline(ctx, err);
             return;
         }
-        ctx.ui.notify(`[remote-pi] stop failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] stop failed: ${String(err)}`, "error");
     }
 }
 async function _cmdDaemonRestart(ctx, id) {
     try {
         if (id) {
             const data = await callSupervisor({ op: "restart", id });
-            ctx.ui.notify(`[remote-pi] Restarted daemon ${id} (${data.state}).`, "info");
+            ctx.ui.notify(`[remote-omp] Restarted daemon ${id} (${data.state}).`, "info");
             return;
         }
         const data = await callSupervisor({ op: "restart_all" });
-        ctx.ui.notify(`[remote-pi] Restarted ${data.restarted.length} daemon(s).`, "info");
+        ctx.ui.notify(`[remote-omp] Restarted ${data.restarted.length} daemon(s).`, "info");
     }
     catch (err) {
         if (err instanceof SupervisorOfflineError) {
             _notifyOffline(ctx, err);
             return;
         }
-        ctx.ui.notify(`[remote-pi] restart failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] restart failed: ${String(err)}`, "error");
     }
 }
 /**
- * `/remote-pi daemon send <id> "<text>"` — injects a prompt into a
+ * `/remote-omp daemon send <id> "<text>"` — injects a prompt into a
  * running daemon via its RPC stdin. The agent processes the prompt as
  * if a user typed it; output flows back via the relay/mesh, not here.
  *
@@ -3241,22 +3245,22 @@ async function _cmdDaemonSend(arg, ctx) {
     // take the entire remainder verbatim.
     const m = arg.match(/^(\S+)\s+(?:"([^"]*)"|(.*))$/);
     if (!m) {
-        ctx.ui.notify("[remote-pi] Usage: /remote-pi daemon send <id> \"<prompt text>\"", "warning");
+        ctx.ui.notify("[remote-omp] Usage: /remote-omp daemon send <id> \"<prompt text>\"", "warning");
         return;
     }
     const id = m[1];
     const text = (m[2] ?? m[3] ?? "").trim();
     if (!text) {
-        ctx.ui.notify("[remote-pi] daemon send: prompt text is empty.", "warning");
+        ctx.ui.notify("[remote-omp] daemon send: prompt text is empty.", "warning");
         return;
     }
     try {
         const data = await callSupervisor({ op: "send", id, text });
         if (data.delivered) {
-            ctx.ui.notify(`[remote-pi] Sent to ${id}: ${text.slice(0, 60)}${text.length > 60 ? "…" : ""}`, "info");
+            ctx.ui.notify(`[remote-omp] Sent to ${id}: ${text.slice(0, 60)}${text.length > 60 ? "…" : ""}`, "info");
         }
         else {
-            ctx.ui.notify(`[remote-pi] daemon ${id} did not accept the prompt (not running?)`, "warning");
+            ctx.ui.notify(`[remote-omp] daemon ${id} did not accept the prompt (not running?)`, "warning");
         }
     }
     catch (err) {
@@ -3264,7 +3268,37 @@ async function _cmdDaemonSend(arg, ctx) {
             _notifyOffline(ctx, err);
             return;
         }
-        ctx.ui.notify(`[remote-pi] daemon send failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] daemon send failed: ${String(err)}`, "error");
+    }
+}
+async function _cmdDaemonSwitch(arg, ctx) {
+    // Parse `<id> <sessionPath>` — id first, then the session file path (may be quoted).
+    const m = arg.match(/^(\S+)\s+(?:"([^"]*)"|(\S+))$/);
+    if (!m) {
+        ctx.ui.notify("[remote-omp] Usage: /remote-omp daemon switch <id> <sessionPath>", "warning");
+        return;
+    }
+    const id = m[1];
+    const sessionPath = (m[2] ?? m[3] ?? "").trim();
+    if (!sessionPath) {
+        ctx.ui.notify("[remote-omp] daemon switch: sessionPath is empty.", "warning");
+        return;
+    }
+    try {
+        const data = await callSupervisor({ op: "switch", id, sessionPath });
+        if (data.switched) {
+            ctx.ui.notify(`[remote-omp] Switched daemon ${id} to session: ${sessionPath}`, "info");
+        }
+        else {
+            ctx.ui.notify(`[remote-omp] daemon ${id} did not accept the switch (not running?)`, "warning");
+        }
+    }
+    catch (err) {
+        if (err instanceof SupervisorOfflineError) {
+            _notifyOffline(ctx, err);
+            return;
+        }
+        ctx.ui.notify(`[remote-omp] daemon switch failed: ${String(err)}`, "error");
     }
 }
 // ── Cron — scheduled prompts for daemons (plan/39) ──────────────────────────
@@ -3278,7 +3312,7 @@ function _tokenizeArgs(s) {
     return out;
 }
 /**
- * `/remote-pi cron <add|list|remove|enable|disable|run|log>` — schedules
+ * `/remote-omp cron <add|list|remove|enable|disable|run|log>` — schedules
  * recurring prompts to daemons via the supervisor. All subcommands require the
  * supervisor running (offline → friendly notice, not a crash).
  */
@@ -3299,16 +3333,16 @@ async function _cmdCron(arg, ctx) {
             case "run": return await _cronRun(rest.trim(), ctx);
             case "log": return await _cronLog(rest, ctx);
             default:
-                ctx.ui.notify("[remote-pi] Usage: /remote-pi cron <add|list|remove|enable|disable|run|log>", "warning");
+                ctx.ui.notify("[remote-omp] Usage: /remote-omp cron <add|list|remove|enable|disable|run|log>", "warning");
         }
     }
     catch (err) {
         if (err instanceof SupervisorOfflineError) {
-            ctx.ui.notify("[remote-pi] Cron needs the supervisor running. Run `remote-pi install` " +
-                "(or start `pi-supervisord`).", "warning");
+            ctx.ui.notify("[remote-omp] Cron needs the supervisor running. Run `remote-omp install` " +
+                "(or start `omp-supervisord`).", "warning");
             return;
         }
-        ctx.ui.notify(`[remote-pi] cron ${sub || "list"} failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] cron ${sub || "list"} failed: ${String(err)}`, "error");
     }
 }
 async function _cronAdd(rest, ctx) {
@@ -3333,7 +3367,7 @@ async function _cronAdd(rest, ctx) {
     }
     const [daemonId, schedule, prompt] = pos;
     if (!daemonId || !schedule || !prompt) {
-        ctx.ui.notify('[remote-pi] Usage: /remote-pi cron add <daemonId> "<cron-expr>" "<prompt>" ' +
+        ctx.ui.notify('[remote-omp] Usage: /remote-omp cron add <daemonId> "<cron-expr>" "<prompt>" ' +
             "[--tz Area/City] [--wake] [--no-skip-busy] [--catchup]", "warning");
         return;
     }
@@ -3349,40 +3383,40 @@ async function _cronAdd(rest, ctx) {
     if (catchup)
         req.catchup = true;
     const data = await callSupervisor(req);
-    ctx.ui.notify(`[remote-pi] Cron ${data.job.id} added → daemon ${daemonId}: "${schedule}"` +
+    ctx.ui.notify(`[remote-omp] Cron ${data.job.id} added → daemon ${daemonId}: "${schedule}"` +
         `${tz ? ` (${tz})` : ""}. Next run: ${data.job.next_run ?? "?"}`, "info");
 }
 async function _cronList(ctx) {
     const data = await callSupervisor({ op: "cron_list" });
     if (data.jobs.length === 0) {
-        ctx.ui.notify("[remote-pi] No cron jobs.", "info");
+        ctx.ui.notify("[remote-omp] No cron jobs.", "info");
         return;
     }
     const lines = data.jobs.map((j) => `${j.enabled ? "✓" : "✗"} ${j.id}  "${j.schedule}"${j.tz ? ` (${j.tz})` : ""}  → ${j.daemon_id}  ` +
         `next:${j.next_run ?? "?"}  last:${j.last_status ?? "—"}${j.last_run ? `@${j.last_run}` : ""}`);
-    ctx.ui.notify(`[remote-pi] Cron jobs (${data.jobs.length}):\n${lines.join("\n")}`, "info");
+    ctx.ui.notify(`[remote-omp] Cron jobs (${data.jobs.length}):\n${lines.join("\n")}`, "info");
 }
 async function _cronMutate(req, jobId, ctx) {
     if (!jobId) {
-        ctx.ui.notify(`[remote-pi] Usage: /remote-pi cron ${req.op === "cron_remove" ? "remove" : "enable|disable"} <jobId>`, "warning");
+        ctx.ui.notify(`[remote-omp] Usage: /remote-omp cron ${req.op === "cron_remove" ? "remove" : "enable|disable"} <jobId>`, "warning");
         return;
     }
     if (req.op === "cron_remove") {
         const data = await callSupervisor(req);
-        ctx.ui.notify(data.removed ? `[remote-pi] Cron ${jobId} removed.` : `[remote-pi] No cron job ${jobId}.`, data.removed ? "info" : "warning");
+        ctx.ui.notify(data.removed ? `[remote-omp] Cron ${jobId} removed.` : `[remote-omp] No cron job ${jobId}.`, data.removed ? "info" : "warning");
     }
     else {
         const data = await callSupervisor(req);
-        ctx.ui.notify(data.updated ? `[remote-pi] Cron ${jobId} ${data.enabled ? "enabled" : "disabled"}.` : `[remote-pi] No cron job ${jobId}.`, data.updated ? "info" : "warning");
+        ctx.ui.notify(data.updated ? `[remote-omp] Cron ${jobId} ${data.enabled ? "enabled" : "disabled"}.` : `[remote-omp] No cron job ${jobId}.`, data.updated ? "info" : "warning");
     }
 }
 async function _cronRun(jobId, ctx) {
     if (!jobId) {
-        ctx.ui.notify("[remote-pi] Usage: /remote-pi cron run <jobId>", "warning");
+        ctx.ui.notify("[remote-omp] Usage: /remote-omp cron run <jobId>", "warning");
         return;
     }
     const data = await callSupervisor({ op: "cron_run", job_id: jobId });
-    ctx.ui.notify(`[remote-pi] Cron ${jobId} fired now → ${data.result}`, "info");
+    ctx.ui.notify(`[remote-omp] Cron ${jobId} fired now → ${data.result}`, "info");
 }
 async function _cronLog(rest, ctx) {
     const toks = _tokenizeArgs(rest);
@@ -3403,29 +3437,29 @@ async function _cronLog(rest, ctx) {
         req.job_id = jobId;
     const data = await callSupervisor(req);
     if (data.entries.length === 0) {
-        ctx.ui.notify("[remote-pi] No cron log entries.", "info");
+        ctx.ui.notify("[remote-omp] No cron log entries.", "info");
         return;
     }
     const lines = data.entries.map((e) => `${new Date(e.ts).toISOString()}  ${e.fired ? "▶" : "∅"} ${e.result}  ${e.job_id} → ${e.daemon_id}  ${e.prompt_preview}`);
-    ctx.ui.notify(`[remote-pi] Cron log (last ${data.entries.length}):\n${lines.join("\n")}`, "info");
+    ctx.ui.notify(`[remote-omp] Cron log (last ${data.entries.length}):\n${lines.join("\n")}`, "info");
 }
 // ── Install/uninstall the supervisor service (plan/26 W3) ────────────────────
 //
-// Installs `pi-supervisord` as a user-level system service (systemd
+// Installs `omp-supervisord` as a user-level system service (systemd
 // `--user` unit on Linux, launchd LaunchAgent on macOS). Once installed:
 //   - Supervisor starts at login + survives reboots.
-//   - `remote-pi daemon start/stop/send/...` work without manually
+//   - `remote-omp daemon start/stop/send/...` work without manually
 //     spawning the supervisor.
 // Uninstall is the inverse — leaves the registry (`daemons.json`) intact,
 // so re-installing later picks up where you left off.
 /**
- * `linkCli` controls whether we symlink `remote-pi` + `pi-supervisord`
+ * `linkCli` controls whether we symlink `remote-omp` + `omp-supervisord`
  * into `~/.local/bin/`. The slash-command path passes `true` (user is
- * inside Pi's TUI — they installed via `pi install npm:remote-pi` and
+ * inside Pi's TUI — they installed via `pi install npm:remote-omp` and
  * need us to expose the CLI for them). The standalone-CLI path passes
  * `false` because the user is already running our binary from PATH (they
- * did `npm install -g remote-pi`), so re-linking would point their
- * `remote-pi` at the Pi-extension copy and diverge on upgrades.
+ * did `npm install -g remote-omp`), so re-linking would point their
+ * `remote-omp` at the Pi-extension copy and diverge on upgrades.
  */
 /** Returns true on success, false when install failed (so the standalone CLI
  *  can exit non-zero — e.g. the Cockpit / CI detect failure by exit code).
@@ -3436,7 +3470,7 @@ function _cmdInstall(ctx, opts = {}) {
     try {
         const result = installService();
         const sections = [
-            `[remote-pi] Supervisor service installed (${result.platform}).`,
+            `[remote-omp] Supervisor service installed (${result.platform}).`,
             `  Unit: ${result.unitPath}`,
             `  Steps:\n${result.log.map((l) => "    " + l).join("\n")}`,
         ];
@@ -3445,10 +3479,10 @@ function _cmdInstall(ctx, opts = {}) {
             sections.push(`  CLI bins linked into ${link.binDir}:`, link.links.map((l) => `    ${l.name} → ${l.target}`).join("\n"), `  Steps:\n${link.log.map((l) => "    " + l).join("\n")}`);
             if (!link.onPath) {
                 if (process.platform === "win32") {
-                    sections.push(`  ⚠ ${link.binDir} was just added to your user PATH (it wasn't there yet).`, `    Open a NEW terminal and run \`remote-pi daemons\` to verify.`);
+                    sections.push(`  ⚠ ${link.binDir} was just added to your user PATH (it wasn't there yet).`, `    Open a NEW terminal and run \`remote-omp daemons\` to verify.`);
                 }
                 else {
-                    sections.push(`  ⚠ ${link.binDir} is not on $PATH yet. Add this line to ~/.zshrc / ~/.bashrc:`, `      export PATH="$HOME/.local/bin:$PATH"`, `    Then open a new terminal and run \`remote-pi daemons\` to verify.`);
+                    sections.push(`  ⚠ ${link.binDir} is not on $PATH yet. Add this line to ~/.zshrc / ~/.bashrc:`, `      export PATH="$HOME/.local/bin:$PATH"`, `    Then open a new terminal and run \`remote-omp daemons\` to verify.`);
                 }
             }
         }
@@ -3456,7 +3490,7 @@ function _cmdInstall(ctx, opts = {}) {
         return true;
     }
     catch (err) {
-        ctx.ui.notify(`[remote-pi] install failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] install failed: ${String(err)}`, "error");
         return false;
     }
 }
@@ -3465,10 +3499,10 @@ function _cmdUninstall(ctx, opts = {}) {
     try {
         const result = uninstallService();
         const sections = [
-            `[remote-pi] Supervisor service uninstalled (${result.platform}).`,
+            `[remote-omp] Supervisor service uninstalled (${result.platform}).`,
             `  Unit: ${result.unitPath} (${result.removed ? "removed" : "not present"})`,
             `  Steps:\n${result.log.map((l) => "    " + l).join("\n")}`,
-            `  Note: daemons registry (~/.pi/remote/daemons.json) kept — re-install restores everything.`,
+            `  Note: daemons registry (~/.omp/remote/daemons.json) kept — re-install restores everything.`,
         ];
         if (linkCli) {
             const unlink = unlinkCliBinaries();
@@ -3479,7 +3513,7 @@ function _cmdUninstall(ctx, opts = {}) {
         ctx.ui.notify(sections.join("\n"), "info");
     }
     catch (err) {
-        ctx.ui.notify(`[remote-pi] uninstall failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] uninstall failed: ${String(err)}`, "error");
     }
 }
 // ── Agent-network commands (plano 19) ─────────────────────────────────────────
@@ -3503,7 +3537,7 @@ function _deployAgentNetworkSkill() {
     //   <skillsRoot>/<skill-name>/SKILL.md
     // The skill `name:` frontmatter must equal the parent directory name. We
     // ship the source pre-arranged that way so deploy is a straight copy into
-    // ~/.pi/remote/skills/agent-network/SKILL.md.
+    // ~/.omp/remote/skills/agent-network/SKILL.md.
     const root = _resolveExtensionDir();
     const src1 = join(root, "skills", "agent-network", "SKILL.md");
     const src2 = join(root, "..", "skills", "agent-network", "SKILL.md");
@@ -3515,7 +3549,7 @@ function _deployAgentNetworkSkill() {
     try {
         mkdirSync(dstDir, { recursive: true });
         copyFileSync(src, dst);
-        // Cleanup legacy deploy at ~/.pi/remote/skills/agent-network.md (flat
+        // Cleanup legacy deploy at ~/.omp/remote/skills/agent-network.md (flat
         // layout, fails the Pi SDK's name-vs-parent-dir validation).
         const legacy = join(skillsDir(), "agent-network.md");
         if (existsSync(legacy)) {
@@ -3530,7 +3564,7 @@ function _deployAgentNetworkSkill() {
 function _wakeAgent(content, label, steeringBehavior) {
     if (!_pi) {
         const detail = "agent session not bound yet";
-        console.error(`[remote-pi] ${label}: ${detail} — message dropped`);
+        console.error(`[remote-omp] ${label}: ${detail} — message dropped`);
         return { ok: false, detail };
     }
     try {
@@ -3542,8 +3576,8 @@ function _wakeAgent(content, label, steeringBehavior) {
     }
     catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
-        console.error(`[remote-pi] ${label}: agent rejected incoming message: ${detail}`);
-        _safeNotify(`[remote-pi] failed to process incoming message: ${detail}`, "error");
+        console.error(`[remote-omp] ${label}: agent rejected incoming message: ${detail}`);
+        _safeNotify(`[remote-omp] failed to process incoming message: ${detail}`, "error");
         return { ok: false, detail };
     }
 }
@@ -3571,7 +3605,7 @@ function _meshMessageForAgent(env) {
         ? "(This is a reply to a previous message of yours.)"
         : `(If a reply is expected, call agent_send with to="${env.from}" and re="${env.id}".)`;
     return {
-        customType: "remote-pi:mesh-message",
+        customType: "remote-omp:mesh-message",
         content: `${header}\n${bodyText}\n\n${footer}`,
         display: true,
     };
@@ -3601,8 +3635,8 @@ function _scheduleMeshMessageDrain() {
             _agentRunActive = false;
             _pendingMeshMessages = [...batch.slice(delivered), ..._pendingMeshMessages];
             const detail = err instanceof Error ? err.message : String(err);
-            console.error(`[remote-pi] queued mesh delivery failed: ${detail}`);
-            _safeNotify(`[remote-pi] failed to process queued mesh messages: ${detail}`, "error");
+            console.error(`[remote-omp] queued mesh delivery failed: ${detail}`);
+            _safeNotify(`[remote-omp] failed to process queued mesh messages: ${detail}`, "error");
         }
     });
 }
@@ -3619,7 +3653,7 @@ function _deliverMeshMessageToAgent(env) {
     });
     _broadcastToActive({ type: "tool_result", tool_call_id: toolCallId, result: { from: env.from, message: bodyText } });
     if (!_pi) {
-        console.error(`[remote-pi] agent-network message from "${env.from}": agent session not bound yet — message dropped`);
+        console.error(`[remote-omp] agent-network message from "${env.from}": agent session not bound yet — message dropped`);
         return;
     }
     _pendingMeshMessages.push(env);
@@ -3648,7 +3682,7 @@ async function _cmdJoin(ctx) {
     // (e.g. legacy/test paths).
     const agentName = _lockedName ?? requestedName;
     if (_meshNode) {
-        ctx.ui.notify("[remote-pi] Already on the local mesh.", "warning");
+        ctx.ui.notify("[remote-omp] Already on the local mesh.", "warning");
         return;
     }
     const joinGeneration = ++_meshJoinGeneration;
@@ -3760,14 +3794,14 @@ async function _cmdJoin(ctx) {
         // name (wizard / explicit `agent_name`) already lives in config or re-derives
         // from `basename(cwd)`; the event above carries the live `#N` for the UI.
         _pi?.sendMessage({
-            customType: "remote-pi:name-assigned",
+            customType: "remote-omp:name-assigned",
             content: assigned === requestedName
                 ? `Mesh name: ${assigned}`
                 : `Mesh name reassigned: "${requestedName}" → "${assigned}" (collision)`,
             details: { requested: requestedName, assigned, changed: assigned !== requestedName },
             display: false,
         });
-        ctx.ui.notify(`[remote-pi] Joined local mesh as "${assigned}" (${peer.currentRole()})`, "info");
+        ctx.ui.notify(`[remote-omp] Joined local mesh as "${assigned}" (${peer.currentRole()})`, "info");
         _refreshFooter(ctx);
         // Plan/25 Wave B/C: try to bring up cross-PC routing now that the
         // local broker exists. No-op if the relay isn't up yet (will fire
@@ -3784,7 +3818,7 @@ async function _cmdJoin(ctx) {
             catch { /* best-effort */ }
             return;
         }
-        ctx.ui.notify(`[remote-pi] join failed: ${String(err)}`, "error");
+        ctx.ui.notify(`[remote-omp] join failed: ${String(err)}`, "error");
     }
 }
 // ── routeClientMessage ────────────────────────────────────────────────────────
@@ -3899,7 +3933,7 @@ export function _routeClientMessageFrom(sender, msg, ctx) {
             if (msg.images && msg.images.length > 0) {
                 void _deliverImageUserMessage(sender, msg, shouldSteer).catch((error) => {
                     const detail = error instanceof Error ? error.message : String(error);
-                    console.error(`[remote-pi] failed delivering image message id=${msg.id}: ${detail}`);
+                    console.error(`[remote-omp] failed delivering image message id=${msg.id}: ${detail}`);
                 });
                 break;
             }
@@ -3958,7 +3992,7 @@ export function _routeClientMessageFrom(sender, msg, ctx) {
         case "session_new": {
             const actionCtx = _lastCtx;
             const daemonMode = process.env["REMOTE_PI_DAEMON"] === "1";
-            // Fresh Pi session via the supervisor: ack, clear remote-pi's mirror, then
+            // Fresh Pi session via the supervisor: ack, clear remote-omp's mirror, then
             // exit with the private code so the supervisor relaunches without
             // --continue → a genuinely fresh session. Used when there's NO command ctx
             // AND as recovery when the captured _lastCtx has gone STALE after an
@@ -4416,8 +4450,8 @@ function _restartSupervisor() {
     const uid = process.getuid?.() ?? 0;
     const steps = _restartSupervisorCommand(process.platform, uid);
     if (!steps) {
-        console.error(`[remote-pi] restart-supervisor is not supported on '${process.platform}' yet. ` +
-            "Restart pi-supervisord manually.");
+        console.error(`[remote-omp] restart-supervisor is not supported on '${process.platform}' yet. ` +
+            "Restart omp-supervisord manually.");
         process.exit(1);
     }
     for (const step of steps) {
@@ -4425,16 +4459,16 @@ function _restartSupervisor() {
         if (r.error) {
             if (step.ignoreFailure)
                 continue;
-            console.error(`[remote-pi] restart-supervisor failed: ${step.cmd} not runnable (${r.error.message}). Is the service installed? Run \`remote-pi install\`.`);
+            console.error(`[remote-omp] restart-supervisor failed: ${step.cmd} not runnable (${r.error.message}). Is the service installed? Run \`remote-omp install\`.`);
             process.exit(1);
         }
         if (r.status !== 0 && !step.ignoreFailure) {
             const detail = (r.stderr || r.stdout || "").trim();
-            console.error(`[remote-pi] restart-supervisor failed (${step.cmd} exited ${r.status})${detail ? `: ${detail}` : ""}.`);
+            console.error(`[remote-omp] restart-supervisor failed (${step.cmd} exited ${r.status})${detail ? `: ${detail}` : ""}.`);
             process.exit(r.status === null ? 1 : r.status);
         }
     }
-    console.log("[remote-pi] Supervisor restarted.");
+    console.log("[remote-omp] Supervisor restarted.");
 }
 function _isDirectRun() {
     try {
@@ -4446,7 +4480,7 @@ function _isDirectRun() {
 }
 /**
  * Read-only probe of the local UDS broker for the mesh roster, backing
- * `remote-pi peers`. Opens a raw connection to `sockPath`, sends a single
+ * `remote-omp peers`. Opens a raw connection to `sockPath`, sends a single
  * unregistered `list_peers` request, and resolves with the peer names from the
  * broker's reply (local UDS peers + cross-PC `<pc>:<peer>` entries).
  *
@@ -4515,7 +4549,7 @@ if (_isDirectRun()) {
             .map(_inspectPeerRecord)
             .filter((peer) => peer !== null);
         if (peers.length === 0) {
-            console.log("[remote-pi] No peers");
+            console.log("[remote-omp] No peers");
         }
         else {
             for (const peer of peers) {
@@ -4562,7 +4596,7 @@ if (_isDirectRun()) {
         }
     }
     else if (subcmd === "create") {
-        // Standalone: `remote-pi create <cwd> [--name "X"]`. The shell already
+        // Standalone: `remote-omp create <cwd> [--name "X"]`. The shell already
         // split the args and stripped the outer quotes, so an arg like
         // `Tmp Agent` arrives as a single element with embedded space. Re-add
         // quotes around any arg containing whitespace so the regex-based
@@ -4586,7 +4620,7 @@ if (_isDirectRun()) {
         await _cmdDaemonsList(stubCtx);
     }
     else if (subcmd === "daemon") {
-        // `remote-pi daemon <op> [args]`. Reuse the fleet-ops handlers — they
+        // `remote-omp daemon <op> [args]`. Reuse the fleet-ops handlers — they
         // already accept a minimal ctx with `notify`.
         const op = cliArgs[0] ?? "";
         const rest = cliArgs.slice(1).map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(" ");
@@ -4607,11 +4641,11 @@ if (_isDirectRun()) {
             await _cmdDaemonSend(rest, stubCtx);
         }
         else {
-            console.log("Usage: remote-pi daemon <start|stop|restart [<id>]|status|send <id> \"<text>\">");
+            console.log("Usage: remote-omp daemon <start|stop|restart [<id>]|status|send <id> \"<text>\">");
         }
     }
     else if (subcmd === "cron") {
-        // `remote-pi cron <op> [args]`. Re-quote args with spaces so the shared
+        // `remote-omp cron <op> [args]`. Re-quote args with spaces so the shared
         // parser sees the same shape as a Pi slash prompt.
         const joined = cliArgs.map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(" ");
         const stubCtx = { ui: { notify: (msg) => console.log(msg) } };
@@ -4625,18 +4659,18 @@ if (_isDirectRun()) {
         // Broker._tryObserverProbe). Null = no broker reachable on this machine.
         const peers = await probeListPeers(sessionSockPath(LOCAL_SESSION_NAME));
         if (peers === null) {
-            console.log("[remote-pi] Mesh offline — no agent is running on this machine.");
+            console.log("[remote-omp] Mesh offline — no agent is running on this machine.");
         }
         else {
-            console.log(`[remote-pi] peers:\n${formatPeerInventory(peers)}`);
+            console.log(`[remote-omp] peers:\n${formatPeerInventory(peers)}`);
         }
     }
     else if (subcmd === "claude") {
         await _cmdClaudeCli(cliArgs);
     }
     else if (subcmd === "install") {
-        // CLI mode = user installed via `npm install -g remote-pi`, so the
-        // `remote-pi` / `pi-supervisord` bins are already on $PATH via npm's
+        // CLI mode = user installed via `npm install -g remote-omp`, so the
+        // `remote-omp` / `omp-supervisord` bins are already on $PATH via npm's
         // global prefix. Explicit `linkCli: false` so we never stomp those
         // with symlinks pointing at a parallel Pi-extension install.
         const stubCtx = { ui: { notify: (msg) => console.log(msg) } };
@@ -4649,11 +4683,11 @@ if (_isDirectRun()) {
         const stubCtx = { ui: { notify: (msg) => console.log(msg) } };
         // `linkCli: true` even from the CLI: unlinking is ALWAYS safe and must run
         // regardless of how install ran. `unlinkCliBinaries` only removes OUR
-        // reserved symlinks (`remote-pi` / `pi-supervisord`) under `~/.local/bin`;
+        // reserved symlinks (`remote-omp` / `omp-supervisord`) under `~/.local/bin`;
         // npm-global bins live in a different prefix and are never touched. So a
-        // user who installed via the TUI (`/remote-pi install`, which links) and
+        // user who installed via the TUI (`/remote-omp install`, which links) and
         // uninstalls from a shell still gets the links cleaned up — the asymmetry
-        // that left an orphaned `~/.local/bin/remote-pi` behind.
+        // that left an orphaned `~/.local/bin/remote-omp` behind.
         _cmdUninstall(stubCtx, { linkCli: true });
     }
     else if (subcmd === "restart-supervisor") {
@@ -4661,7 +4695,7 @@ if (_isDirectRun()) {
     }
     else {
         console.log([
-            "Usage: remote-pi <command>",
+            "Usage: remote-omp <command>",
             "",
             "Daemon registry:",
             "  create <cwd> [--name \"Name\"]   Register a folder as a daemon",
@@ -4678,9 +4712,9 @@ if (_isDirectRun()) {
             "  cron list|run|remove|log        Manage scheduled prompts (needs the supervisor)",
             "",
             "Service:",
-            "  install                         Install pi-supervisord as a system service",
+            "  install                         Install omp-supervisord as a system service",
             "  uninstall                       Remove the system service",
-            "  restart-supervisor              Restart the pi-supervisord process",
+            "  restart-supervisor              Restart the omp-supervisord process",
             "",
             "Devices:",
             "  devices                         List paired phones (peers.json)",
@@ -4695,7 +4729,7 @@ if (_isDirectRun()) {
         ].join("\n"));
     }
 }
-// ── `remote-pi claude` — launch Claude Code connected to the mesh ─────────────
+// ── `remote-omp claude` — launch Claude Code connected to the mesh ─────────────
 /**
  * Resolve the packaged agent-network skill path
  * (`<pkgRoot>/skills/agent-network/SKILL.md`). Single source of truth shared
@@ -4710,7 +4744,7 @@ function _agentNetworkSkillPath() {
     return existsSync(skill) ? skill : null;
 }
 async function _cmdClaudeCli(args) {
-    // Contract: `remote-pi claude [cwd] [claude-flags...]`. The optional cwd is
+    // Contract: `remote-omp claude [cwd] [claude-flags...]`. The optional cwd is
     // ONLY the leading positional (first token, not a flag); everything after it
     // is forwarded verbatim to the `claude` binary (e.g. `--resume`, `-c`,
     // `-p "prompt"`). Restricting cwd to the leading token avoids mistaking a
@@ -4721,24 +4755,24 @@ async function _cmdClaudeCli(args) {
     // Wizard when no local config exists
     if (!localConfigExists(targetCwd)) {
         const suggested = defaultAgentName(targetCwd);
-        process.stdout.write(`\n[remote-pi] No config found for ${targetCwd}\n`);
+        process.stdout.write(`\n[remote-omp] No config found for ${targetCwd}\n`);
         process.stdout.write("Let's set up this agent.\n\n");
         const rl = createInterface({ input: process.stdin, output: process.stdout });
         const agentName = await new Promise((res) => rl.question(`Agent name [${suggested}]: `, (ans) => { rl.close(); res(ans.trim() || suggested); }));
         saveLocalConfig(targetCwd, { agent_name: agentName, auto_start_relay: true });
-        process.stdout.write(`[remote-pi] Config saved: agent="${agentName}"\n\n`);
+        process.stdout.write(`[remote-omp] Config saved: agent="${agentName}"\n\n`);
     }
     // Resolve mesh server script path (dist/mcp/mesh_server.js)
     const here = fileURLToPath(import.meta.url);
     const distRoot = dirname(here);
     const meshServerPath = resolve(distRoot, "mcp/mesh_server.js");
     if (!existsSync(meshServerPath)) {
-        console.log(`[remote-pi] mesh server not found at ${meshServerPath}. Run pnpm build first.`);
+        console.log(`[remote-omp] mesh server not found at ${meshServerPath}. Run pnpm build first.`);
         process.exit(1);
     }
     const absCwd = resolve(targetCwd);
-    const SERVER_NAME = "remote-pi-mesh";
-    // The mesh MCP must be visible ONLY inside a `remote-pi claude` session — a
+    const SERVER_NAME = "remote-omp-mesh";
+    // The mesh MCP must be visible ONLY inside a `remote-omp claude` session — a
     // plain `claude` in the same repo must NOT inherit it (otherwise every
     // ordinary session silently joins the mesh as a stray agent).
     //
@@ -4763,15 +4797,15 @@ async function _cmdClaudeCli(args) {
     // empirically — NOT the git root, NOT CLAUDE_PROJECT_DIR). We spawn claude
     // with `cwd: absCwd`, the MCP child inherits it, so the server self-identifies
     // as the right agent without leaking that path to any other session.
-    // Unique per pid so concurrent `remote-pi claude` launches don't collide.
-    const mcpConfigPath = join(tmpdir(), `remote-pi-mesh-mcp-${process.pid}.json`);
+    // Unique per pid so concurrent `remote-omp claude` launches don't collide.
+    const mcpConfigPath = join(tmpdir(), `remote-omp-mesh-mcp-${process.pid}.json`);
     writeFileSync(mcpConfigPath, JSON.stringify({
         mcpServers: {
             [SERVER_NAME]: { command: process.execPath, args: [meshServerPath] },
         },
     }));
     // Inject the agent-network protocol as a system prompt instead of deploying a
-    // skill file into ~/.claude. Anyone running `remote-pi claude` is here to use
+    // skill file into ~/.claude. Anyone running `remote-omp claude` is here to use
     // the mesh, so load the protocol unconditionally — no lazy skill gating, no
     // global skills-dir pollution, and the packaged file is the single source of
     // truth shared with the Pi runtime. Skipped only if the file is missing.

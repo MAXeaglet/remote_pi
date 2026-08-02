@@ -6,7 +6,7 @@ export function formatMeshAckResult(to, ack) {
             return errorResult(`NOT delivered — "${to}" came back BUSY, which only happens when an ` +
                 `OUT-OF-DATE broker leader dropped the message (busy was removed in the ` +
                 `current version). Restart the agent that leads the local broker (the ` +
-                `oldest Pi/remote-pi process) so it picks up the new build, then resend.`);
+                `oldest Pi/remote-omp process) so it picks up the new build, then resend.`);
         case "denied":
             return errorResult(formatDenied(to, ack));
         case "timeout":

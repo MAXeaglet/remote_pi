@@ -6,7 +6,7 @@ export declare class SupervisorAlreadyRunningError extends Error {
     constructor(sockPath: string);
 }
 export interface SupervisorOptions {
-    /** Absolute path to remote-pi's dist/index.js — passed as -e to each
+    /** Absolute path to remote-omp's dist/index.js — passed as -e to each
      *  spawned `pi`. Defaults to the location relative to where this file
      *  is bundled (so the supervisor finds itself). */
     extensionPath: string;
@@ -44,7 +44,7 @@ export declare class Supervisor {
     private _opStartAll;
     /** Spawn a single registered daemon by id. Idempotent: a daemon already
      *  running returns `started: false`. Unknown id → ok:false. This is what
-     *  `/remote-pi create` calls so a freshly-registered folder boots its Pi
+     *  `/remote-omp create` calls so a freshly-registered folder boots its Pi
      *  immediately instead of waiting for the next supervisor restart. */
     private _opStart;
     private _opStopAll;
@@ -58,6 +58,7 @@ export declare class Supervisor {
     private _opRestart;
     private _opRestartAll;
     private _opSend;
+    private _opSwitch;
     private _opRegister;
     private _opUnregister;
     private _opCronAdd;

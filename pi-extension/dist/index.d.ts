@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * pi-extension — remote-pi slash commands + AgentBridge wiring
+ * pi-extension — remote-omp slash commands + AgentBridge wiring
  *
  * Exported as ExtensionFactory (default export) to be loaded by Pi SDK:
  *   pi -e $(pwd)/dist/index.js
  *
  * State machine:  idle → started → paired
- *   /remote-pi start   connects to relay (idle → started)
- *   /remote-pi pair    shows QR for new peers (started, async → paired via auto-listener)
- *   /remote-pi stop    closes everything (any → idle)
+ *   /remote-omp start   connects to relay (idle → started)
+ *   /remote-omp pair    shows QR for new peers (started, async → paired via auto-listener)
+ *   /remote-omp stop    closes everything (any → idle)
  *
  * Pairing (post plano 06 — sem Noise XX):
  *   App envia inner `pair_request` (id, token, device_name) sobre canal opaco.
@@ -36,14 +36,14 @@ export type RemoteState = "idle" | "started";
 /** Relay connectivity as seen by an RPC client (Cockpit). Derived from
  *  `_state` + `_relay`: "disconnected" = relay off (idle); "connected" = live
  *  WS; "reconnecting" = was on, WS dropped, retrying. Surfaced via the
- *  `remote-pi:relay-state` custom message (see `_emitRelayState`). */
+ *  `remote-omp:relay-state` custom message (see `_emitRelayState`). */
 export type RelayConnectivity = "connected" | "reconnecting" | "disconnected";
 /** Sentinel prefix for a transparent control message an RPC client sends on the
  *  `prompt` channel (stdin). The `input` hook intercepts it, runs the action,
  *  and swallows it (`action:"handled"`) so it never becomes an LLM turn or a
  *  transcript entry. Starts with NUL so it can't collide with real user input
  *  and doesn't begin with "/" (which would route to the command parser). */
-export declare const CTRL_PREFIX = "\0remote-pi-ctrl:";
+export declare const CTRL_PREFIX = "\0remote-omp-ctrl:";
 type BufferMsg = {
     role: "user" | "assistant" | "toolResult" | string;
     content?: unknown;
@@ -67,7 +67,7 @@ type MeshEnvelope = {
 };
 /** Test-only override of the message buffer. */
 /**
- * Test-only: emulate what `/remote-pi` does on the returning-user path
+ * Test-only: emulate what `/remote-omp` does on the returning-user path
  * (join the local mesh, then start the relay) without touching the FS for
  * a `localConfigExists()` lookup. Lets tests bring the relay up without
  * mocking the wizard or the local config storage.
@@ -77,7 +77,7 @@ type MeshEnvelope = {
  * `ExtensionContext` interface.
  */
 export declare function _connectForTest(ctx: unknown): Promise<void>;
-/** Test-only: tear everything down (mirrors `/remote-pi stop`). */
+/** Test-only: tear everything down (mirrors `/remote-omp stop`). */
 export declare function _stopForTest(ctx: unknown): Promise<void>;
 /** Test-only: read/reset the `_disposed` flag. Production clears it only when
  *  a host reuses this module for a replacement session; tests share one module
@@ -98,7 +98,7 @@ export declare function _getLockedNameForTest(): string | null;
 export declare function _resetCwdLockForTest(): void;
 /**
  * Test-only: relay-only startup, no UDS mesh join. Replaces the old
- * `remote-pi relay start` handler that some tests captured to bring up
+ * `remote-omp relay start` handler that some tests captured to bring up
  * the relay in isolation (e.g. ping/pong tests that don't care about the
  * agent-network broker).
  */
@@ -174,7 +174,7 @@ export declare function routeClientMessage(msg: ClientMessage, ctx: Pick<Extensi
  */
 export declare function _mapAgentMessagesToEvents(messages: BufferMsg[]): SessionHistoryEvent[];
 /**
- * `remote-pi restart-supervisor` — restarts the `pi-supervisord` PROCESS
+ * `remote-omp restart-supervisor` — restarts the `omp-supervisord` PROCESS
  * (not the daemons). The supervisor is a long-running Node process with no
  * hot-reload, so after a `dist` rebuild the old code keeps running until the
  * process is restarted. The Cockpit "Restart supervisor" button shells out to
@@ -196,7 +196,7 @@ export interface RestartStep {
 export declare function _restartSupervisorCommand(platform: NodeJS.Platform, uid: number): RestartStep[] | null;
 /**
  * Read-only probe of the local UDS broker for the mesh roster, backing
- * `remote-pi peers`. Opens a raw connection to `sockPath`, sends a single
+ * `remote-omp peers`. Opens a raw connection to `sockPath`, sends a single
  * unregistered `list_peers` request, and resolves with the peer names from the
  * broker's reply (local UDS peers + cross-PC `<pc>:<peer>` entries).
  *

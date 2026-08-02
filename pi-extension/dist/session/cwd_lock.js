@@ -5,7 +5,7 @@ import { roomIdFor } from "../rooms.js";
 import { removeStaleSock, tryBind, tryConnect } from "./leader_election.js";
 import { ipcAddress, usesNamedPipe } from "./ipc.js";
 /**
- * Per-cwd singleton lock for `/remote-pi`. At most one Pi process per
+ * Per-cwd singleton lock for `/remote-omp`. At most one Pi process per
  * working directory may hold the lock; the second attempt is refused.
  *
  * Why a UDS bind instead of a PID lock file:
@@ -17,7 +17,7 @@ import { ipcAddress, usesNamedPipe } from "./ipc.js";
  *   - Kernel-enforced — there is no race window between "check if held"
  *     and "claim", which an explicit PID file would have.
  *
- * Lock files live in `<root>/.pi/remote/locks/<roomId>.sock` (where `roomId`
+ * Lock files live in `<root>/.omp/remote/locks/<roomId>.sock` (where `roomId`
  * is `sha256(realpath(cwd))[:12]` and `<root>` is `$REMOTE_PI_HOME` or the
  * home dir), NOT inside the cwd itself, to dodge:
  *   - The 104/108-char path-length limit on UDS sockets on macOS/Linux.
@@ -27,14 +27,14 @@ import { ipcAddress, usesNamedPipe } from "./ipc.js";
  * Caller workflow:
  *   const lock = await acquireCwdLock(cwd);
  *   if (!lock.ok) { ui.notify("Já tem um agente rodando nessa pasta."); return; }
- *   // …run /remote-pi normally; lock auto-releases on process exit
+ *   // …run /remote-omp normally; lock auto-releases on process exit
  */
 /** Resolved at call time (not module load) so tests can redirect the lock
- *  dir away from the developer's real `~/.pi/remote/locks` via
+ *  dir away from the developer's real `~/.omp/remote/locks` via
  *  `REMOTE_PI_HOME` — same override the daemon registry honors. */
 function locksDir() {
     const root = process.env["REMOTE_PI_HOME"] || homedir();
-    return join(root, ".pi", "remote", "locks");
+    return join(root, ".omp", "remote", "locks");
 }
 /**
  * Lock id for an agent. Keyed by **(cwd, name)** so several agents can run in

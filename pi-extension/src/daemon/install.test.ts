@@ -115,8 +115,8 @@ describe("renderTemplate", () => {
     home: "/Users/x",
     user: "jacob",
     path: "/usr/local/bin:/usr/bin:/bin",
-    vbs: "/Users/x/.pi/remote/RemotePiSupervisorLauncher.vbs",
-    logPath: "/Users/x/.pi/remote/supervisord.log",
+    vbs: "/Users/x/.omp/remote/RemotePiSupervisorLauncher.vbs",
+    logPath: "/Users/x/.omp/remote/supervisord.log",
   };
 
   test("substitutes every placeholder in systemd template", () => {
@@ -142,7 +142,7 @@ describe("renderTemplate", () => {
     expect(out).not.toContain("{PATH}");
     expect(out).toContain(`<string>${vars.node}</string>`);
     expect(out).toContain(`<string>${vars.supervisor}</string>`);
-    expect(out).toContain(`<string>${vars.home}/.pi/remote/supervisord.log</string>`);
+    expect(out).toContain(`<string>${vars.home}/.omp/remote/supervisord.log</string>`);
   });
 
   test("global replacement (multiple occurrences of same placeholder)", () => {
@@ -179,11 +179,11 @@ describe("renderTemplate", () => {
 });
 
 describe("vbsLauncherPath", () => {
-  test("is absolute and ends with the launcher .vbs under ~/.pi/remote", () => {
+  test("is absolute and ends with the launcher .vbs under ~/.omp/remote", () => {
     const p = vbsLauncherPath();
     expect(isAbsolute(p)).toBe(true);
     expect(p.endsWith("RemotePiSupervisorLauncher.vbs")).toBe(true);
-    expect(p.endsWith(join(".pi", "remote", "RemotePiSupervisorLauncher.vbs"))).toBe(true);
+    expect(p.endsWith(join(".omp", "remote", "RemotePiSupervisorLauncher.vbs"))).toBe(true);
   });
 });
 
@@ -220,7 +220,7 @@ describe("buildElevatedCmd", () => {
 // systemd/launchd paths are POSIX-only (Windows uses Task Scheduler — plan/40).
 describe.skipIf(posixOnly)("paths", () => {
   test("systemdUnitPath lives under ~/.config/systemd/user/", () => {
-    expect(systemdUnitPath()).toMatch(/\.config\/systemd\/user\/remote-pi-supervisord\.service$/);
+    expect(systemdUnitPath()).toMatch(/\.config\/systemd\/user\/remote-omp-supervisord\.service$/);
   });
 
   test("launchdPlistPath lives under ~/Library/LaunchAgents/", () => {
@@ -295,7 +295,7 @@ describe.skipIf(posixOnly)("linkCliBinaries / unlinkCliBinaries", () => {
     expect(result.links).toHaveLength(2);
 
     const names = result.links.map((l) => l.name).sort();
-    expect(names).toEqual(["pi-supervisord", "remote-pi"]);
+    expect(names).toEqual(["omp-supervisord", "remote-omp"]);
 
     for (const link of result.links) {
       expect(lstatSync(link.path).isSymbolicLink()).toBe(true);
@@ -317,13 +317,13 @@ describe.skipIf(posixOnly)("linkCliBinaries / unlinkCliBinaries", () => {
     const binDir = join(tmpHome, ".local", "bin");
     mkdirSync(binDir, { recursive: true });
     // Write a fake stale symlink first
-    const stale = join(binDir, "remote-pi");
+    const stale = join(binDir, "remote-omp");
     writeFileSync(join(tmpHome, "fake-old.js"), "// old\n");
     require("node:fs").symlinkSync(join(tmpHome, "fake-old.js"), stale);
     expect(readlinkSync(stale)).toBe(join(tmpHome, "fake-old.js"));
 
     const result = linkCliBinaries(tmpHome, fakePaths);
-    const pi = result.links.find((l) => l.name === "remote-pi")!;
+    const pi = result.links.find((l) => l.name === "remote-omp")!;
     expect(readlinkSync(pi.path)).toBe(pi.target);
     expect(readlinkSync(pi.path)).not.toBe(join(tmpHome, "fake-old.js"));
   });
@@ -386,11 +386,11 @@ describe.skipIf(!posixOnly)("linkCliBinaries / unlinkCliBinaries (Windows .cmd s
     rmSync(tmpHome, { recursive: true, force: true });
   });
 
-  test("link writes remote-pi.cmd + pi-supervisord.cmd pointing at node + targets", () => {
+  test("link writes remote-omp.cmd + omp-supervisord.cmd pointing at node + targets", () => {
     const result = linkCliBinaries(tmpHome, fakePaths, { node, mutatePath: false });
     expect(result.binDir).toBe(join(tmpHome, ".local", "bin"));
     const names = result.links.map((l) => l.name).sort();
-    expect(names).toEqual(["pi-supervisord.cmd", "remote-pi.cmd"]);
+    expect(names).toEqual(["omp-supervisord.cmd", "remote-omp.cmd"]);
     for (const link of result.links) {
       expect(existsSync(link.path)).toBe(true);
       const content = readFileSync(link.path, "utf8");

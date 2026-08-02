@@ -1,5 +1,5 @@
 /**
- * CLI ↔ supervisor IPC contract for `~/.pi/remote/supervisor.sock`.
+ * CLI ↔ supervisor IPC contract for `~/.omp/remote/supervisor.sock`.
  *
  * Framing: one JSON object per line, newline-terminated. The CLI sends a
  * single `ControlRequest`, the supervisor sends a single `ControlReply`,
@@ -21,7 +21,7 @@ export type DaemonState = "running" | "stopped" | "starting" | "crashed";
 export interface DaemonInfo {
   id: string;            // sha256(cwd)[0..8] — see daemon/id.ts
   cwd: string;           // absolute realpath
-  name: string;          // from <cwd>/.pi/remote-pi/config.json agent_name
+  name: string;          // from <cwd>/.omp/remote-omp/config.json agent_name
   state: DaemonState;
   pid?: number;          // current process pid, when running
   uptime_s?: number;     // since last successful spawn, when running
@@ -39,6 +39,7 @@ export type ControlRequest =
   | { op: "restart_all" }
   | { op: "restart"; id: string }
   | { op: "send"; id: string; text: string }
+  | { op: "switch"; id: string; sessionPath: string }
   | { op: "register"; cwd: string }
   | { op: "unregister"; id: string }
   // ── cron (plan/39) ──
@@ -68,6 +69,7 @@ export interface ControlReplyShapes {
   restart_all: { restarted: string[] };
   restart: { id: string; state: DaemonState; restarted: boolean };
   send: { id: string; delivered: boolean };
+  switch: { id: string; switched: boolean };
   register: { id: string; cwd: string };
   unregister: { removed: boolean; cwd?: string };
   // ── cron (plan/39) ──

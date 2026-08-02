@@ -3,7 +3,7 @@
  *
  * pi-extension creates its **own** `ModelRegistry` instance alongside the
  * one `AgentSession` instantiates internally. Both read the same on-disk
- * sources (`~/.pi/auth/*`, `~/.pi/models.json`), so they stay in sync —
+ * sources (`~/.omp/auth/*`, `~/.omp/models.json`), so they stay in sync —
  * we just call `refresh()` before each `list_models` request to capture
  * changes the user makes via `/login` or `/scoped-models` in the TUI.
  *

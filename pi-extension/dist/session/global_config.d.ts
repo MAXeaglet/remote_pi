@@ -7,7 +7,7 @@
  * friction without value.
  */
 export declare const LOCAL_SESSION_NAME = "local";
-/** Ensures the new subdirs exist inside the existing ~/.pi/remote/. */
+/** Ensures the new subdirs exist inside the existing ~/.omp/remote/. */
 export declare function ensureGlobalDirs(): void;
 /**
  * Local-IPC address for a session's broker. POSIX → a `.sock` file under the

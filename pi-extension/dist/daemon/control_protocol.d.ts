@@ -1,5 +1,5 @@
 /**
- * CLI ↔ supervisor IPC contract for `~/.pi/remote/supervisor.sock`.
+ * CLI ↔ supervisor IPC contract for `~/.omp/remote/supervisor.sock`.
  *
  * Framing: one JSON object per line, newline-terminated. The CLI sends a
  * single `ControlRequest`, the supervisor sends a single `ControlReply`,
@@ -48,6 +48,10 @@ export type ControlRequest = {
     op: "send";
     id: string;
     text: string;
+} | {
+    op: "switch";
+    id: string;
+    sessionPath: string;
 } | {
     op: "register";
     cwd: string;
@@ -128,6 +132,10 @@ export interface ControlReplyShapes {
     send: {
         id: string;
         delivered: boolean;
+    };
+    switch: {
+        id: string;
+        switched: boolean;
     };
     register: {
         id: string;

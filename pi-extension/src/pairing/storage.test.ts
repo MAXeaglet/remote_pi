@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // Tests import the module after stubbing `os.homedir` so the fallback
-// path writes inside a temp dir instead of the dev's real ~/.pi/remote.
+// path writes inside a temp dir instead of the dev's real ~/.omp/remote.
 // vi.mock must run before the real module load.
 const _tmpHome = mkdtempSync(join(tmpdir(), "pi-storage-"));
 vi.mock("node:os", async (importOriginal) => {
@@ -316,10 +316,10 @@ describe("getOrCreateEd25519Keypair — locked keyring does NOT regenerate", () 
 // ── Corrupt peer record isolation ────────────────────────────────────────────
 
 describe("peer record corruption isolation", () => {
-  const peersPath = join(_tmpHome, ".pi", "remote", "peers.json");
+  const peersPath = join(_tmpHome, ".omp", "remote", "peers.json");
 
   function writePeers(peers: unknown): void {
-    mkdirSync(join(_tmpHome, ".pi", "remote"), { recursive: true });
+    mkdirSync(join(_tmpHome, ".omp", "remote"), { recursive: true });
     writeFileSync(peersPath, JSON.stringify({ peers }, null, 2));
   }
 
@@ -383,7 +383,7 @@ describe("peer record corruption isolation", () => {
 // ── File identity wins over a READABLE keyring (masking bug) ─────────────────
 //
 // A file-backed/headless install pairs the mobile against the key in
-// `~/.pi/remote/identity.json`. If the platform keyring later becomes readable
+// `~/.omp/remote/identity.json`. If the platform keyring later becomes readable
 // (D-Bus/libsecret installed, a desktop session, a stale entry from another
 // install), consulting it FIRST would mask the file identity — returning a
 // different key, or minting a fresh one over an empty keyring — and break the
@@ -449,14 +449,14 @@ describe("getOrCreateEd25519Keypair — file identity wins over a readable keyri
 
 
 describe("owner snapshot mutation tokens", () => {
-  const peersPath = join(_tmpHome, ".pi", "remote", "peers.json");
+  const peersPath = join(_tmpHome, ".omp", "remote", "peers.json");
   const snapshotStorage = storage as typeof storage & {
     snapshotOwnerPubkeys(): Promise<readonly { rawOwnerPubkey: unknown; token: unknown }[]>;
     conditionalRemovePeer(remoteEpk: string, expectedToken: unknown): Promise<{ outcome: string }>;
   };
 
   function writePeers(peers: unknown): void {
-    mkdirSync(join(_tmpHome, ".pi", "remote"), { recursive: true });
+    mkdirSync(join(_tmpHome, ".omp", "remote"), { recursive: true });
     writeFileSync(peersPath, JSON.stringify({ peers }, null, 2));
   }
 

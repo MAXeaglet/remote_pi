@@ -9,27 +9,27 @@ import { defaultAgentName } from "../session/local_config.js";
  *
  * Schema rationale (decision Q in plan/26): the registry stores **only**
  * `cwd` per entry. Everything else (agent_name, auto_start_relay, etc.)
- * is the cwd's local config at `<cwd>/.pi/remote-pi/config.json` — single
+ * is the cwd's local config at `<cwd>/.omp/remote-omp/config.json` — single
  * source of truth, no duplication. The daemon `id` is *derived* from cwd
  * via `daemonIdForCwd`, never persisted.
  *
  * Cwds are always normalized to an **absolute realpath** before storage.
- * A user typing `/remote-pi create ~/Movies` or `/remote-pi create .`
- * results in the same entry as `/remote-pi create /Users/x/Movies` — no
+ * A user typing `/remote-omp create ~/Movies` or `/remote-omp create .`
+ * results in the same entry as `/remote-omp create /Users/x/Movies` — no
  * surprise duplicates, symlinks collapse correctly.
  */
 /** Resolved at call time so tests can override via `REMOTE_PI_HOME`. The
- *  prod path is always `~/.pi/remote/daemons.json`. */
+ *  prod path is always `~/.omp/remote/daemons.json`. */
 function registryPathInternal() {
     const root = process.env["REMOTE_PI_HOME"] || homedir();
-    return join(root, ".pi", "remote", "daemons.json");
+    return join(root, ".omp", "remote", "daemons.json");
 }
 /**
  * Normalizes a user-provided path: expands `~`/`~/...`, resolves relative
  * components against `process.cwd()`, and runs `realpath` to canonicalize
  * symlinks. Throws if the resulting path doesn't exist on disk.
  *
- * `/remote-pi create` always stores normalized paths so two registrations
+ * `/remote-omp create` always stores normalized paths so two registrations
  * of the same logical folder via different aliases produce a single entry.
  */
 export function normalizeCwd(input) {
@@ -146,7 +146,7 @@ export function migrateRegistryNames() {
 }
 /** Test/diag-only: returns the on-disk path. Exported so tests can poke
  *  at it (e.g. tmpdir override is done via env, but for now the path is
- *  hardcoded to ~/.pi/remote/daemons.json). */
+ *  hardcoded to ~/.omp/remote/daemons.json). */
 export function registryPath() {
     return registryPathInternal();
 }

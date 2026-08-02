@@ -10,11 +10,11 @@ function tmpCwd(): string {
   return mkdtempSync(join(tmpdir(), "pi-cwdlock-"));
 }
 
-/** Redirect the lock dir away from the developer's real `~/.pi/remote/locks`
+/** Redirect the lock dir away from the developer's real `~/.omp/remote/locks`
  *  so running the suite never binds sockets in the live mesh's directory.
  *
  *  Base it on a SHORT root (`/tmp`), NOT `os.tmpdir()`: the lock socket nests
- *  `<home>/.pi/remote/locks/<12-char>.sock`, and on macOS `os.tmpdir()` is a
+ *  `<home>/.omp/remote/locks/<12-char>.sock`, and on macOS `os.tmpdir()` is a
  *  deep `/var/folders/…/T/` path that pushes the socket past the ~104-char UDS
  *  path limit → `bind` fails → `acquireCwdLock` returns `ok:false` and these
  *  tests fail (and break `prepublishOnly`). `/tmp` keeps the full path short. */
@@ -83,7 +83,7 @@ describe("acquireCwdLock", () => {
   // path via real broker crashes in `src/session/leader_election.test.ts`)
   // to cover the OS primitive, and trust that `acquireCwdLock` composes
   // it correctly. Manual repro: `kill -9` a Pi process holding the lock,
-  // then run `/remote-pi` again — acquires cleanly.
+  // then run `/remote-omp` again — acquires cleanly.
 
   test("same cwd, DIFFERENT names → independent locks (multi-agent per folder)", async () => {
     const cwd = tmpCwd();

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-const LOCAL_DIR = ".pi/remote-pi";
+const LOCAL_DIR = ".omp/remote-omp";
 const LOCAL_FILE = "config.json";
 /**
  * Escape hatch: when set, carries the WHOLE local config as inline JSON,
@@ -92,7 +92,7 @@ function directConfig() {
 }
 /**
  * True when a local config is available for this cwd — either inline via
- * `REMOTE_PI_DIRECT_CONFIG` or as `<cwd>/.pi/remote-pi/config.json` on disk.
+ * `REMOTE_PI_DIRECT_CONFIG` or as `<cwd>/.omp/remote-omp/config.json` on disk.
  */
 export function localConfigExists(cwd) {
     return directConfig() !== null || existsSync(pathFor(cwd));
@@ -136,7 +136,7 @@ export function saveLocalConfig(cwd, patch) {
     }
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[remote-pi] could not persist local config ${p}: ${message}`);
+        console.warn(`[remote-omp] could not persist local config ${p}: ${message}`);
     }
 }
 /**

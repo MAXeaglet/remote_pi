@@ -1,5 +1,5 @@
 /**
- * Minimal wizard for `/remote-pi join` with no argument.
+ * Minimal wizard for `/remote-omp join` with no argument.
  *
  * The Pi SDK `ExtensionUIContext.select` accepts a title and string options
  * and returns the chosen option. Wizard offers existing sessions + an "explicit

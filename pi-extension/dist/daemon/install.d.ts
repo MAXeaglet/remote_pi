@@ -1,19 +1,19 @@
 /**
- * Generates and activates a system service for `pi-supervisord` so the
+ * Generates and activates a system service for `omp-supervisord` so the
  * daemon fleet survives reboots (plan/26 W3).
  *
  * Platform support:
  *   - **macOS**: writes `~/Library/LaunchAgents/dev.remotepi.supervisord.plist`
  *     and runs `launchctl bootstrap gui/<uid> <plist>` (modern API) with a
  *     fallback to `launchctl load` for older macOS.
- *   - **Linux**: writes `~/.config/systemd/user/remote-pi-supervisord.service`
+ *   - **Linux**: writes `~/.config/systemd/user/remote-omp-supervisord.service`
  *     and runs `systemctl --user daemon-reload && systemctl --user enable
- *     --now remote-pi-supervisord.service`.
+ *     --now remote-omp-supervisord.service`.
  *
  * Uninstall reverses both. Idempotent — re-running install over an existing
  * unit refreshes it (paths could have changed if user moved node_modules).
  *
- * **What does NOT happen here**: the actual `npm install -g remote-pi` step.
+ * **What does NOT happen here**: the actual `npm install -g remote-omp` step.
  * The user has to make the supervisor bin reachable on disk before install
  * can wire up the service. The `findSupervisorScript` resolver detects
  * common cases (npm global, pnpm global, local dev clone) and yields a
@@ -34,23 +34,23 @@ export declare function detectPlatform(): SupervisorPlatform;
 export declare function findSupervisorScript(): string;
 /**
  * Absolute path to the extension's CLI entry (`dist/index.js`). This is
- * the file we symlink to `~/.local/bin/remote-pi` so the user can run
- * `remote-pi <subcommand>` from any shell after installing the extension
- * through Pi (`pi install npm:remote-pi`).
+ * the file we symlink to `~/.local/bin/remote-omp` so the user can run
+ * `remote-omp <subcommand>` from any shell after installing the extension
+ * through Pi (`pi install npm:remote-omp`).
  *
  * Same resolution strategy as `findSupervisorScript`: from
  * `dist/daemon/install.js` → `dist/index.js`.
  */
-export declare function findRemotePiScript(): string;
+export declare function findRemoteOmpScript(): string;
 export declare function findNodeBinary(): string;
 export declare function findTemplate(name: "systemd" | "launchd" | "taskscheduler" | "vbs-launcher"): string;
 export declare function systemdUnitPath(): string;
 export declare function launchdPlistPath(): string;
 export declare const LAUNCHD_LABEL = "dev.remotepi.supervisord";
 /** systemd --user unit name (with `.service`) for the supervisor. */
-export declare const SYSTEMD_UNIT = "remote-pi-supervisord.service";
+export declare const SYSTEMD_UNIT = "remote-omp-supervisord.service";
 /** Windows Task Scheduler task name (plan/40). */
-export declare const WINDOWS_TASK_NAME = "RemotePiSupervisor";
+export declare const WINDOWS_TASK_NAME = "RemoteOmpSupervisor";
 /** Path of the rendered Task Scheduler XML (input to `schtasks /Create /XML`). */
 export declare function taskXmlPath(): string;
 /**
@@ -63,7 +63,7 @@ export declare function vbsLauncherPath(): string;
  * Combined stdout/stderr log for the Windows supervisor. The Task Scheduler
  * launches it hidden via wscript, so without this redirect its output (and the
  * forwarded daemon-child stderr) would vanish — mirrors launchd/systemd, which
- * already log to `~/.pi/remote/supervisord.log`.
+ * already log to `~/.omp/remote/supervisord.log`.
  */
 export declare function supervisordLogPath(): string;
 export interface RenderVars {
@@ -134,7 +134,7 @@ export declare function userLocalBinDir(home?: string): string;
  */
 export declare function isOnPath(dir: string, envPath?: string): boolean;
 /**
- * Create (or refresh) the `remote-pi` + `pi-supervisord` symlinks in
+ * Create (or refresh) the `remote-omp` + `omp-supervisord` symlinks in
  * `~/.local/bin/`. Idempotent — replaces stale links pointing at old
  * extension paths (Pi can reinstall the extension to a different hash dir
  * on upgrades, so this MUST overwrite).
