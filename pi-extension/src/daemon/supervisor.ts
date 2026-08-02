@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { execFileSync as _execFileSync } from "node:child_process";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -100,6 +101,27 @@ export interface SupervisorOptions {
   extensionPath: string;
   /** Override the `pi` binary path. Defaults to "pi" on PATH. */
   piBin?: string;
+}
+
+/** Resolve the agent binary for spawning: env override → explicit opt → detect omp/pi. */
+export function resolvePiBinOption(
+  piBin: string | undefined,
+): string | undefined {
+  if (piBin !== undefined) return piBin;
+  if (process.env.REMOTE_PI_BIN) return process.env.REMOTE_PI_BIN;
+  // omp (oh-my-pi) is a Pi fork; prefer it when present so daemons work on omp hosts.
+  try {
+    const { execFileSync } = { execFileSync: _execFileSync };
+    const which = execFileSync(
+      process.platform === "win32" ? "where" : "which",
+      ["omp"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ) as string;
+    if (which.trim()) return "omp";
+  } catch {
+    /* no omp — fall through to default "pi" */
+  }
+  return undefined;
 }
 
 /** Pure decision for `fireJob` (plan/39) — picks the action from the daemon's

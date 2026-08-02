@@ -18,7 +18,7 @@
  */
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { Supervisor, SupervisorAlreadyRunningError } from "../daemon/supervisor.js";
+import { Supervisor, SupervisorAlreadyRunningError, resolvePiBinOption } from "../daemon/supervisor.js";
 
 const HELP_TEXT = `pi-supervisord — Remote Pi daemon supervisor
 
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
   const distRoot = dirname(dirname(here));  // dist/bin → dist
   const extensionPath = join(distRoot, "index.js");
 
-  const supervisor = new Supervisor({ extensionPath });
+  const supervisor = new Supervisor({ extensionPath, piBin: resolvePiBinOption(undefined) });
   await supervisor.start();
   process.stderr.write(
     `[pi-supervisord] up — UDS: ~/.pi/remote/supervisor.sock, extension: ${extensionPath}\n`,

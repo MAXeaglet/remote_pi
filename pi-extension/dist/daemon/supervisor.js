@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { execFileSync as _execFileSync } from "node:child_process";
 import { createConnection, createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -67,6 +68,24 @@ function _probeSupervisor(path) {
         sock.once("connect", () => { clearTimeout(timer); done(true); });
         sock.once("error", () => { clearTimeout(timer); done(false); });
     });
+}
+/** Resolve the agent binary for spawning: env override → explicit opt → detect omp/pi. */
+export function resolvePiBinOption(piBin) {
+    if (piBin !== undefined)
+        return piBin;
+    if (process.env.REMOTE_PI_BIN)
+        return process.env.REMOTE_PI_BIN;
+    // omp (oh-my-pi) is a Pi fork; prefer it when present so daemons work on omp hosts.
+    try {
+        const { execFileSync } = { execFileSync: _execFileSync };
+        const which = execFileSync(process.platform === "win32" ? "where" : "which", ["omp"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        if (which.trim())
+            return "omp";
+    }
+    catch {
+        /* no omp — fall through to default "pi" */
+    }
+    return undefined;
 }
 export function decideFireAction(o) {
     if (!o.running)

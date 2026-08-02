@@ -13,6 +13,8 @@ export interface SupervisorOptions {
     /** Override the `pi` binary path. Defaults to "pi" on PATH. */
     piBin?: string;
 }
+/** Resolve the agent binary for spawning: env override → explicit opt → detect omp/pi. */
+export declare function resolvePiBinOption(piBin: string | undefined): string | undefined;
 /** Pure decision for `fireJob` (plan/39) — picks the action from the daemon's
  *  liveness/busy state + the job's flags. Tested in isolation for all 4 ramos. */
 export type FireAction = "send" | "wake_and_send" | "skip_down" | "skip_busy";
