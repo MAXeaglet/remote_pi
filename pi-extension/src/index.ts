@@ -37,7 +37,19 @@ import type {
   ExtensionContext,
   ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
-import { SettingsManager, convertToPng } from "@earendil-works/pi-coding-agent";
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
+// omp (oh-my-pi) legacy shim may not export convertToPng; resolve lazily via
+// dynamic import so a missing export doesn't break module load.
+let _convertToPng: ((data: string, mime: string) => Promise<{ data?: string; mimeType?: string } | null>) | undefined;
+async function convertToPngSafe(data: string, mime: string) {
+  if (_convertToPng === undefined) {
+    try {
+      const mod = await import("@earendil-works/pi-coding-agent");
+      _convertToPng = (mod as any).convertToPng;
+    } catch { _convertToPng = null as any; }
+  }
+  return _convertToPng ? _convertToPng(data, mime) : null;
+}
 import { type Ed25519Keypair } from "./pairing/crypto.js";
 import { buildQRUri, qrSession, renderQRAscii, clampPairTtlMs, TOKEN_TTL_MS } from "./pairing/qr.js";
 import {
@@ -367,7 +379,7 @@ async function _renderablePngPathFromImage(
   if (mime === IMAGE_PREVIEW_MIME) return undefined;
 
   try {
-    const converted = await convertToPng(imageData, mime);
+    const converted = await convertToPngSafe(imageData, mime);
     if (!converted || converted.mimeType !== IMAGE_PREVIEW_MIME || !converted.data) {
       return undefined;
     }
