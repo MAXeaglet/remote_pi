@@ -21,6 +21,8 @@ import { type LocalConfig } from "../session/local_config.js";
 export interface RpcChildOptions {
     /** Path to the `pi` binary. Defaults to "pi" (must be on PATH). */
     piBin?: string;
+    /** True when the agent binary is omp (oh-my-pi) — adjusts spawn flags. */
+    agentIsOmp?: boolean;
     /** Absolute path to the remote-pi `dist/index.js` to load as -e. */
     extensionPath: string;
     /** Working directory for the spawned process. Determines which local
@@ -126,7 +128,7 @@ export declare function busyTransition(line: string): boolean | null;
  * loaded twice" conflict, which comes from the extension being BOTH installed
  * in ~/.pi/agent/extensions or cwd/.pi/extensions AND passed via `-e`.)
  */
-export declare function rpcSpawnArgs(extensionPath: string, sessionName?: string, useContinue?: boolean): string[];
+export declare function rpcSpawnArgs(extensionPath: string, sessionName?: string, useContinue?: boolean, agentIsOmp?: boolean): string[];
 export declare class RpcChild extends EventEmitter {
     private readonly opts;
     private child;

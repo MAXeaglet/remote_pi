@@ -26,6 +26,8 @@ import { defaultAgentName, loadLocalConfig, type LocalConfig } from "../session/
 export interface RpcChildOptions {
   /** Path to the `pi` binary. Defaults to "pi" (must be on PATH). */
   piBin?: string;
+  /** True when the agent binary is omp (oh-my-pi) — adjusts spawn flags. */
+  agentIsOmp?: boolean;
   /** Absolute path to the remote-pi `dist/index.js` to load as -e. */
   extensionPath: string;
   /** Working directory for the spawned process. Determines which local
@@ -130,9 +132,18 @@ export function _npmShimTarget(cmdPath: string): string | null {
   let content: string;
   try { content = readFileSync(cmdPath, "utf8"); } catch { return null; }
   const m = content.match(/"%dp0%\\([^"]+\.[cm]?js)"/i);
-  if (!m) return null;
-  const target = join(dirname(cmdPath), m[1]);
-  return existsSync(target) ? target : null;
+  if (m) {
+    const target = join(dirname(cmdPath), m[1]);
+    return existsSync(target) ? target : null;
+  }
+  // bun shim: `bun "C:\abs\cli.js" %*` — not dp0-relative, so match an
+  // absolute quoted path directly (omp/oh-my-pi installs this way).
+  const bunM = content.match(/^\s*@echo off\s*\r?\n(bun|bun\.exe)\s+"([^"]+\\cli\.js)"/im);
+  if (bunM) {
+    const target = bunM[2];
+    return existsSync(target) ? target : null;
+  }
+  return null;
 }
 
 /**
@@ -200,14 +211,20 @@ export function rpcSpawnArgs(
   extensionPath: string,
   sessionName?: string,
   useContinue = true,
+  agentIsOmp = false,
 ): string[] {
-  return [
+  // omp (oh-my-pi) renamed --approve → --auto-approve and dropped --name.
+  const approveFlag = agentIsOmp ? "--auto-approve" : "--approve";
+  const args = [
     "--mode", "rpc",
-    "--approve",
+    approveFlag,
     ...(useContinue ? ["--continue"] : []),
-    ...(sessionName ? ["--name", sessionName] : []),
     "-e", extensionPath,
   ];
+  if (!agentIsOmp && sessionName) {
+    args.splice(4, 0, "--name", sessionName);
+  }
+  return args;
 }
 
 export class RpcChild extends EventEmitter {
@@ -265,7 +282,7 @@ export class RpcChild extends EventEmitter {
     this.forceFreshSessionOnNextSpawn = false;
     // On Windows `prefixArgs` carries pi's cli.js (we spawn node directly); on
     // POSIX it's empty and `command` is `pi` itself.
-    const args = [...piTarget.prefixArgs, ...rpcSpawnArgs(this.opts.extensionPath, sessionName, useContinue)];
+    const args = [...piTarget.prefixArgs, ...rpcSpawnArgs(this.opts.extensionPath, sessionName, useContinue, this.opts.agentIsOmp)];
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       ...this.opts.env,

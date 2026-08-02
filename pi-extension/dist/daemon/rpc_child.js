@@ -163,14 +163,19 @@ function parseGetStateResponse(line) {
  * loaded twice" conflict, which comes from the extension being BOTH installed
  * in ~/.pi/agent/extensions or cwd/.pi/extensions AND passed via `-e`.)
  */
-export function rpcSpawnArgs(extensionPath, sessionName, useContinue = true) {
-    return [
+export function rpcSpawnArgs(extensionPath, sessionName, useContinue = true, agentIsOmp = false) {
+    // omp (oh-my-pi) renamed --approve → --auto-approve and dropped --name.
+    const approveFlag = agentIsOmp ? "--auto-approve" : "--approve";
+    const args = [
         "--mode", "rpc",
-        "--approve",
+        approveFlag,
         ...(useContinue ? ["--continue"] : []),
-        ...(sessionName ? ["--name", sessionName] : []),
         "-e", extensionPath,
     ];
+    if (!agentIsOmp && sessionName) {
+        args.splice(4, 0, "--name", sessionName);
+    }
+    return args;
 }
 export class RpcChild extends EventEmitter {
     opts;
@@ -226,7 +231,7 @@ export class RpcChild extends EventEmitter {
         this.forceFreshSessionOnNextSpawn = false;
         // On Windows `prefixArgs` carries pi's cli.js (we spawn node directly); on
         // POSIX it's empty and `command` is `pi` itself.
-        const args = [...piTarget.prefixArgs, ...rpcSpawnArgs(this.opts.extensionPath, sessionName, useContinue)];
+        const args = [...piTarget.prefixArgs, ...rpcSpawnArgs(this.opts.extensionPath, sessionName, useContinue, this.opts.agentIsOmp)];
         const env = {
             ...process.env,
             ...this.opts.env,

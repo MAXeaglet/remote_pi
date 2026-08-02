@@ -571,6 +571,9 @@ export class Supervisor {
         };
         if (this.opts.piBin !== undefined)
             childOpts.piBin = this.opts.piBin;
+        // Detect omp (oh-my-pi) so daemon spawn uses omp-compatible flags.
+        const effectivePiBin = this.opts.piBin ?? resolvePiBinOption(undefined);
+        childOpts.agentIsOmp = effectivePiBin !== undefined && /omp/i.test(effectivePiBin);
         const child = new RpcChild(childOpts);
         const slot = { id, cwd, child, restartTimer: null, restartAttempt: 0 };
         this.children.set(id, slot);
