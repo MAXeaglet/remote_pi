@@ -76,11 +76,15 @@ export function resolvePiBinOption(piBin) {
     if (process.env.REMOTE_PI_BIN)
         return process.env.REMOTE_PI_BIN;
     // omp (oh-my-pi) is a Pi fork; prefer it when present so daemons work on omp hosts.
+    // Return the .exe (not the .cmd shim) so spawn() gets a directly executable file.
     try {
-        const { execFileSync } = { execFileSync: _execFileSync };
-        const which = execFileSync(process.platform === "win32" ? "where" : "which", ["omp"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-        if (which.trim())
-            return "omp";
+        const which = _execFileSync(process.platform === "win32" ? "where" : "which", ["omp"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        const lines = which.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const exe = lines.find((l) => /\.exe$/i.test(l));
+        if (exe)
+            return exe;
+        if (lines[0])
+            return lines[0];
     }
     catch {
         /* no omp — fall through to default "pi" */

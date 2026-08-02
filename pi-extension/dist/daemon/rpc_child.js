@@ -78,10 +78,18 @@ export function _npmShimTarget(cmdPath) {
         return null;
     }
     const m = content.match(/"%dp0%\\([^"]+\.[cm]?js)"/i);
-    if (!m)
-        return null;
-    const target = join(dirname(cmdPath), m[1]);
-    return existsSync(target) ? target : null;
+    if (m) {
+        const target = join(dirname(cmdPath), m[1]);
+        return existsSync(target) ? target : null;
+    }
+    // bun shim: `bun "C:\abs\cli.js" %*` — not dp0-relative, so match an
+    // absolute quoted path directly (omp/oh-my-pi installs this way).
+    const bunM = content.match(/^\s*@echo off\s*\r?\n(bun|bun\.exe)\s+"([^"]+\\cli\.js)"/im);
+    if (bunM) {
+        const target = bunM[2];
+        return existsSync(target) ? target : null;
+    }
+    return null;
 }
 /**
  * Maps an RPC stdout line to a busy-state transition: `message_start` → true
