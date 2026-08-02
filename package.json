@@ -1,11 +1,20 @@
 {
   "name": "remote-pi",
-  "version": "0.6.0-omp.1",
+  "version": "0.6.0-omp.2",
   "description": "Remote Pi (omp-compatible fork): agent network + remote control for Pi/omp coding agents",
   "type": "module",
   "main": "pi-extension/dist/index.js",
   "exports": {
     ".": "./pi-extension/dist/index.js"
+  },
+  "bin": {
+    "remote-pi": "pi-extension/dist/index.js",
+    "pi-supervisord": "pi-extension/dist/bin/supervisord.js"
+  },
+  "pi": {
+    "extensions": [
+      "./pi-extension/dist"
+    ]
   },
   "files": [
     "pi-extension/dist"
