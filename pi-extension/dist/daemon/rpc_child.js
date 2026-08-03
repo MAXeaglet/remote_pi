@@ -145,8 +145,10 @@ function parseGetMessagesResponse(line) {
         return null;
     }
     const o = obj;
-    if (o.type !== "response" || o.command !== "get_messages")
+    if (o.type !== "response" || (o.command !== "get_messages" && o.command !== "get_messages_page"))
         return null;
+    if (o.success === false)
+        return { id: typeof o.id === "string" ? o.id : undefined, messages: [] };
     const messages = o.data?.messages;
     if (!Array.isArray(messages))
         return null;
@@ -327,11 +329,12 @@ export class RpcChild extends EventEmitter {
         }
     }
     /**
-     * Requests the current session transcript via RPC `get_messages` and waits
-     * for the response. Returns assistant text messages (chronological), or an
-     * empty array on timeout / not-running.
+     * Requests the current session transcript via RPC `get_messages_page` and waits
+     * for the response. Uses the paged endpoint (not monolithic `get_messages`)
+     * so large sessions don't blow the transport limit. Returns assistant text
+     * messages (chronological), or an empty array on timeout / not-running.
      */
-    getMessages(timeoutMs = 15000) {
+    getMessages(timeoutMs = 25000) {
         return new Promise((resolve) => {
             if (!this.child || !this.child.stdin || this._state !== "running") {
                 resolve([]);
@@ -344,7 +347,7 @@ export class RpcChild extends EventEmitter {
             }, timeoutMs);
             this._messagesPending.set(id, { resolve, timer });
             try {
-                this.child.stdin.write(JSON.stringify({ id, type: "get_messages" }) + "\n");
+                this.child.stdin.write(JSON.stringify({ id, type: "get_messages_page", limit: 100 }) + "\n");
             }
             catch {
                 clearTimeout(timer);

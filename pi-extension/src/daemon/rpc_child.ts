@@ -183,8 +183,9 @@ function parseGetStateResponse(line: string): { id?: string; isStreaming?: boole
 function parseGetMessagesResponse(line: string): { id?: string; messages: string[] } | null {
   let obj: unknown;
   try { obj = JSON.parse(line); } catch { return null; }
-  const o = obj as { type?: unknown; command?: unknown; id?: unknown; data?: unknown };
-  if (o.type !== "response" || o.command !== "get_messages") return null;
+  const o = obj as { type?: unknown; command?: unknown; id?: unknown; success?: unknown; data?: unknown };
+  if (o.type !== "response" || (o.command !== "get_messages" && o.command !== "get_messages_page")) return null;
+  if (o.success === false) return { id: typeof o.id === "string" ? o.id : undefined, messages: [] };
   const messages = (o.data as { messages?: unknown })?.messages;
   if (!Array.isArray(messages)) return null;
   const texts: string[] = [];
@@ -372,11 +373,12 @@ export class RpcChild extends EventEmitter {
   }
 
   /**
-   * Requests the current session transcript via RPC `get_messages` and waits
-   * for the response. Returns assistant text messages (chronological), or an
-   * empty array on timeout / not-running.
+   * Requests the current session transcript via RPC `get_messages_page` and waits
+   * for the response. Uses the paged endpoint (not monolithic `get_messages`)
+   * so large sessions don't blow the transport limit. Returns assistant text
+   * messages (chronological), or an empty array on timeout / not-running.
    */
-  getMessages(timeoutMs = 15000): Promise<string[]> {
+  getMessages(timeoutMs = 25000): Promise<string[]> {
     return new Promise((resolve) => {
       if (!this.child || !this.child.stdin || this._state !== "running") {
         resolve([]);
@@ -389,7 +391,7 @@ export class RpcChild extends EventEmitter {
       }, timeoutMs);
       this._messagesPending.set(id, { resolve, timer });
       try {
-        this.child.stdin.write(JSON.stringify({ id, type: "get_messages" }) + "\n");
+        this.child.stdin.write(JSON.stringify({ id, type: "get_messages_page", limit: 100 }) + "\n");
       } catch {
         clearTimeout(timer);
         this._messagesPending.delete(id);

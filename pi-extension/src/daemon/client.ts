@@ -46,6 +46,7 @@ export class SupervisorOfflineError extends Error {
  */
 export async function callSupervisor<Op extends ControlRequest["op"]>(
   req: Extract<ControlRequest, { op: Op }>,
+  timeoutMs?: number,
 ): Promise<ControlReplyFor<Op>> {
   const sockPath = getSupervisorSockPath();
   // POSIX fast-fail on a missing socket file. Windows pipes have no file —
@@ -55,7 +56,7 @@ export async function callSupervisor<Op extends ControlRequest["op"]>(
   const sock = await _connect(sockPath);
   try {
     sock.write(encodeRequest(req));
-    const line = await _readLine(sock);
+    const line = await _readLine(sock, timeoutMs);
     const reply = parseReply(line) as ControlReply<ControlReplyFor<Op>>;
     if (!reply.ok) throw new Error(reply.error);
     return reply.data as ControlReplyFor<Op>;
@@ -107,13 +108,13 @@ function _connect(sockPath: string): Promise<Socket> {
   });
 }
 
-function _readLine(sock: Socket): Promise<string> {
+function _readLine(sock: Socket, timeoutMs?: number): Promise<string> {
   return new Promise((resolve, reject) => {
     let buf = "";
     const timer = setTimeout(() => {
       reject(new Error("supervisor reply timeout"));
       sock.destroy();
-    }, REPLY_TIMEOUT_MS);
+    }, timeoutMs ?? REPLY_TIMEOUT_MS);
     sock.on("data", (chunk: string) => {
       buf += chunk;
       const nl = buf.indexOf("\n");

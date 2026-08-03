@@ -3309,7 +3309,7 @@ async function _cmdDaemonReply(id, ctx) {
         return;
     }
     try {
-        const data = await callSupervisor({ op: "reply", id: trimmed });
+        const data = await callSupervisor({ op: "reply", id: trimmed }, 20000);
         const msgs = data.messages ?? [];
         if (msgs.length === 0) {
             ctx.ui.notify(`[remote-omp] daemon ${trimmed}: no assistant messages (idle or not running)`, "info");

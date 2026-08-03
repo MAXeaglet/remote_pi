@@ -34,7 +34,7 @@ export class SupervisorOfflineError extends Error {
  *   - `Error` from `parseReply` when the reply line is malformed.
  *   - The supervisor's own error string when `ok: false`.
  */
-export async function callSupervisor(req) {
+export async function callSupervisor(req, timeoutMs) {
     const sockPath = getSupervisorSockPath();
     // POSIX fast-fail on a missing socket file. Windows pipes have no file —
     // skip the check and let `_connect` fail fast if the pipe isn't there.
@@ -43,7 +43,7 @@ export async function callSupervisor(req) {
     const sock = await _connect(sockPath);
     try {
         sock.write(encodeRequest(req));
-        const line = await _readLine(sock);
+        const line = await _readLine(sock, timeoutMs);
         const reply = parseReply(line);
         if (!reply.ok)
             throw new Error(reply.error);
@@ -98,13 +98,13 @@ function _connect(sockPath) {
         });
     });
 }
-function _readLine(sock) {
+function _readLine(sock, timeoutMs) {
     return new Promise((resolve, reject) => {
         let buf = "";
         const timer = setTimeout(() => {
             reject(new Error("supervisor reply timeout"));
             sock.destroy();
-        }, REPLY_TIMEOUT_MS);
+        }, timeoutMs ?? REPLY_TIMEOUT_MS);
         sock.on("data", (chunk) => {
             buf += chunk;
             const nl = buf.indexOf("\n");

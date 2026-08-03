@@ -175,9 +175,10 @@ export declare class RpcChild extends EventEmitter {
      */
     sendPrompt(text: string, requestId?: string): boolean;
     /**
-     * Requests the current session transcript via RPC `get_messages` and waits
-     * for the response. Returns assistant text messages (chronological), or an
-     * empty array on timeout / not-running.
+     * Requests the current session transcript via RPC `get_messages_page` and waits
+     * for the response. Uses the paged endpoint (not monolithic `get_messages`)
+     * so large sessions don't blow the transport limit. Returns assistant text
+     * messages (chronological), or an empty array on timeout / not-running.
      */
     getMessages(timeoutMs?: number): Promise<string[]>;
     /**

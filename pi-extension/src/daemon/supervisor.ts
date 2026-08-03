@@ -425,7 +425,11 @@ export class Supervisor {
     if (slot.child.state !== "running") {
       return { ok: false, error: `daemon ${id} state is ${slot.child.state}` };
     }
+    process.stderr.write(`[remote-omp-supervisord] reply: getMessages() on ${id}...\n`);
+    try { require("node:fs").appendFileSync(require("node:path").join(require("node:os").homedir(), ".omp", "remote", "supervisord-debug.log"), `[${new Date().toISOString()}] reply: getMessages() on ${id}\n`); } catch {}
     const messages = await slot.child.getMessages();
+    process.stderr.write(`[remote-omp-supervisord] reply: got ${messages.length} messages\n`);
+    try { require("node:fs").appendFileSync(require("node:path").join(require("node:os").homedir(), ".omp", "remote", "supervisord-debug.log"), `[${new Date().toISOString()}] reply: got ${messages.length} messages\n`); } catch {}
     return { ok: true, data: { id, messages } };
   }
 
