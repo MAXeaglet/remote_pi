@@ -40,6 +40,7 @@ export type ControlRequest =
   | { op: "restart"; id: string }
   | { op: "send"; id: string; text: string }
   | { op: "switch"; id: string; sessionPath: string }
+  | { op: "reply"; id: string }
   | { op: "register"; cwd: string }
   | { op: "unregister"; id: string }
   // ── cron (plan/39) ──
@@ -70,6 +71,7 @@ export interface ControlReplyShapes {
   restart: { id: string; state: DaemonState; restarted: boolean };
   send: { id: string; delivered: boolean };
   switch: { id: string; switched: boolean };
+  reply: { id: string; messages: string[] };
   register: { id: string; cwd: string };
   unregister: { removed: boolean; cwd?: string };
   // ── cron (plan/39) ──

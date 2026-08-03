@@ -2528,6 +2528,7 @@ const extension: ExtensionFactory = (pi: ExtensionAPI): void => {
   pi.registerCommand("remote-omp daemon status",  { description: "Show fleet runtime status (pid, uptime, restarts)", handler: async (_, ctx) => { _lastCtx = ctx; await _cmdDaemonStatus(ctx); } });
   pi.registerCommand("remote-omp daemon send",    { description: "Send a prompt to a daemon: `daemon send <id> \"<text>\"`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonSend(args.trim(), ctx); } });
   pi.registerCommand("remote-omp daemon switch",  { description: "Switch a daemon to a different session: `daemon switch <id> <sessionPath>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonSwitch(args.trim(), ctx); } });
+  pi.registerCommand("remote-omp daemon reply",   { description: "Fetch the last assistant reply from a daemon: `daemon reply <id>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonReply(args.trim(), ctx); } });
   pi.registerCommand("remote-omp cron",           { description: "Schedule recurring prompts to daemons: `cron <add|list|remove|enable|disable|run|log>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdCron(args.trim(), ctx); } });
 
   // Service install / uninstall (plan/26 W3)
@@ -3619,6 +3620,27 @@ async function _cmdDaemonSwitch(arg: string, ctx: Pick<ExtensionContext, "ui">):
   } catch (err) {
     if (err instanceof SupervisorOfflineError) { _notifyOffline(ctx, err); return; }
     ctx.ui.notify(`[remote-omp] daemon switch failed: ${String(err)}`, "error");
+  }
+}
+
+async function _cmdDaemonReply(id: string, ctx: Pick<ExtensionContext, "ui">): Promise<void> {
+  const trimmed = id.trim();
+  if (!trimmed) {
+    ctx.ui.notify("[remote-omp] Usage: /remote-omp daemon reply <id>", "warning");
+    return;
+  }
+  try {
+    const data = await callSupervisor({ op: "reply", id: trimmed });
+    const msgs = data.messages ?? [];
+    if (msgs.length === 0) {
+      ctx.ui.notify(`[remote-omp] daemon ${trimmed}: no assistant messages (idle or not running)`, "info");
+      return;
+    }
+    const last = msgs[msgs.length - 1]!;
+    ctx.ui.notify(`[remote-omp] daemon ${trimmed} reply (${msgs.length} msgs):\n${last.slice(0, 2000)}`, "info");
+  } catch (err) {
+    if (err instanceof SupervisorOfflineError) { _notifyOffline(ctx, err); return; }
+    ctx.ui.notify(`[remote-omp] daemon reply failed: ${String(err)}`, "error");
   }
 }
 
@@ -5045,8 +5067,9 @@ if (_isDirectRun()) {
     else if (op === "status")  { await _cmdDaemonStatus(stubCtx); }
     else if (op === "send")    { await _cmdDaemonSend(rest, stubCtx); }
     else if (op === "switch")  { await _cmdDaemonSwitch(rest, stubCtx); }
+    else if (op === "reply")   { await _cmdDaemonReply(cliArgs[1] ?? "", stubCtx); }
     else {
-      console.log("Usage: remote-omp daemon <start|stop|restart [<id>]|status|send <id> \"<text>\"|switch <id> <sessionPath>>");
+      console.log("Usage: remote-omp daemon <start|stop|restart [<id>]|status|send <id> \"<text>\"|switch <id> <sessionPath>|reply <id>>");
     }
   } else if (subcmd === "cron") {
     // `remote-omp cron <op> [args]`. Re-quote args with spaces so the shared

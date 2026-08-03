@@ -150,6 +150,8 @@ export declare class RpcChild extends EventEmitter {
     private _busy;
     /** In-flight `get_state` requests, keyed by request id. */
     private readonly _statePending;
+    /** In-flight `get_messages` requests, keyed by request id. */
+    private readonly _messagesPending;
     constructor(opts: RpcChildOptions);
     get state(): DaemonState;
     /** Passive busy hint from the stream. Prefer `refreshBusy()` for an
@@ -172,6 +174,12 @@ export declare class RpcChild extends EventEmitter {
      * Returns false if the child isn't running (caller decides how to report).
      */
     sendPrompt(text: string, requestId?: string): boolean;
+    /**
+     * Requests the current session transcript via RPC `get_messages` and waits
+     * for the response. Returns assistant text messages (chronological), or an
+     * empty array on timeout / not-running.
+     */
+    getMessages(timeoutMs?: number): Promise<string[]>;
     /**
      * Switch the child's active session (RPC `switch_session`). omp/Pi RPC
      * protocol supports switching sessions in a long-lived process, so a daemon

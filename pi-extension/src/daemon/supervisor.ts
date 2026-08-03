@@ -266,6 +266,7 @@ export class Supervisor {
       case "restart":      return this._opRestart(req.id);
       case "send":         return this._opSend(req.id, req.text);
       case "switch":       return this._opSwitch(req.id, req.sessionPath);
+      case "reply":        return this._opReply(req.id);
       case "register":     return this._opRegister(req.cwd);
       case "unregister":   return this._opUnregister(req.id);
       case "cron_add":     return this._opCronAdd(req);
@@ -416,6 +417,16 @@ export class Supervisor {
     }
     const ok = slot.child.switchSession(sessionPath);
     return { ok: true, data: { id, switched: ok } };
+  }
+
+  private async _opReply(id: string): Promise<ControlReply<unknown>> {
+    const slot = this.children.get(id);
+    if (!slot) return { ok: false, error: `daemon ${id} not running` };
+    if (slot.child.state !== "running") {
+      return { ok: false, error: `daemon ${id} state is ${slot.child.state}` };
+    }
+    const messages = await slot.child.getMessages();
+    return { ok: true, data: { id, messages } };
   }
 
   private _opRegister(rawCwd: string): ControlReply<unknown> {

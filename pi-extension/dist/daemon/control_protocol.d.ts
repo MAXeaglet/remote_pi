@@ -53,6 +53,9 @@ export type ControlRequest = {
     id: string;
     sessionPath: string;
 } | {
+    op: "reply";
+    id: string;
+} | {
     op: "register";
     cwd: string;
 } | {
@@ -136,6 +139,10 @@ export interface ControlReplyShapes {
     switch: {
         id: string;
         switched: boolean;
+    };
+    reply: {
+        id: string;
+        messages: string[];
     };
     register: {
         id: string;

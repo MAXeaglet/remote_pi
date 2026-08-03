@@ -179,6 +179,30 @@ function parseGetStateResponse(line: string): { id?: string; isStreaming?: boole
   };
 }
 
+/** Parses a `get_messages` RPC response line, extracting assistant text. */
+function parseGetMessagesResponse(line: string): { id?: string; messages: string[] } | null {
+  let obj: unknown;
+  try { obj = JSON.parse(line); } catch { return null; }
+  const o = obj as { type?: unknown; command?: unknown; id?: unknown; data?: unknown };
+  if (o.type !== "response" || o.command !== "get_messages") return null;
+  const messages = (o.data as { messages?: unknown })?.messages;
+  if (!Array.isArray(messages)) return null;
+  const texts: string[] = [];
+  for (const m of messages) {
+    const mm = m as { role?: unknown; content?: unknown };
+    if (mm.role !== "assistant") continue;
+    const content = mm.content;
+    if (typeof content === "string") { texts.push(content); continue; }
+    if (Array.isArray(content)) {
+      for (const c of content) {
+        const cc = c as { type?: unknown; text?: unknown };
+        if (cc.type === "text" && typeof cc.text === "string") texts.push(cc.text);
+      }
+    }
+  }
+  return { id: typeof o.id === "string" ? o.id : undefined, messages: texts };
+}
+
 /**
  * CLI args for the daemon's `pi --mode rpc` child.
  *
@@ -247,6 +271,8 @@ export class RpcChild extends EventEmitter {
   private _busy = false;
   /** In-flight `get_state` requests, keyed by request id. */
   private readonly _statePending = new Map<string, { resolve: (b: boolean) => void; timer: ReturnType<typeof setTimeout> }>();
+  /** In-flight `get_messages` requests, keyed by request id. */
+  private readonly _messagesPending = new Map<string, { resolve: (msgs: string[]) => void; timer: ReturnType<typeof setTimeout> }>();
 
   constructor(private readonly opts: RpcChildOptions) {
     super();
@@ -346,6 +372,33 @@ export class RpcChild extends EventEmitter {
   }
 
   /**
+   * Requests the current session transcript via RPC `get_messages` and waits
+   * for the response. Returns assistant text messages (chronological), or an
+   * empty array on timeout / not-running.
+   */
+  getMessages(timeoutMs = 15000): Promise<string[]> {
+    return new Promise((resolve) => {
+      if (!this.child || !this.child.stdin || this._state !== "running") {
+        resolve([]);
+        return;
+      }
+      const id = `gm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const timer = setTimeout(() => {
+        this._messagesPending.delete(id);
+        resolve([]);
+      }, timeoutMs);
+      this._messagesPending.set(id, { resolve, timer });
+      try {
+        this.child.stdin.write(JSON.stringify({ id, type: "get_messages" }) + "\n");
+      } catch {
+        clearTimeout(timer);
+        this._messagesPending.delete(id);
+        resolve([]);
+      }
+    });
+  }
+
+  /**
    * Switch the child's active session (RPC `switch_session`). omp/Pi RPC
    * protocol supports switching sessions in a long-lived process, so a daemon
    * can drive multiple sessions without a restart. Returns false if the child
@@ -404,6 +457,17 @@ export class RpcChild extends EventEmitter {
         this._statePending.delete(gs.id);
         if (typeof gs.isStreaming === "boolean") this._busy = gs.isStreaming;
         pending.resolve(this._busy);
+      }
+    }
+    // Capture get_messages responses: a prompt completes, then the host can
+    // request the transcript. Surface the parsed assistant text to listeners.
+    const gm = parseGetMessagesResponse(line);
+    if (gm && gm.id) {
+      const pending = this._messagesPending.get(gm.id);
+      if (pending) {
+        clearTimeout(pending.timer);
+        this._messagesPending.delete(gm.id);
+        pending.resolve(gm.messages);
       }
     }
     this.emit("stdout", line);

@@ -59,6 +59,7 @@ export declare class Supervisor {
     private _opRestartAll;
     private _opSend;
     private _opSwitch;
+    private _opReply;
     private _opRegister;
     private _opUnregister;
     private _opCronAdd;
