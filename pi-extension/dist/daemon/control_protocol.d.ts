@@ -144,6 +144,7 @@ export interface ControlReplyShapes {
         id: string;
         messages: string[];
         lastMessageId?: string;
+        lastTimestamp?: number;
     };
     register: {
         id: string;

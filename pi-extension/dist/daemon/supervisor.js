@@ -380,8 +380,8 @@ export class Supervisor {
         if (slot.child.state !== "running") {
             return { ok: false, error: `daemon ${id} state is ${slot.child.state}` };
         }
-        const { messages, lastMessageId } = await slot.child.getMessages();
-        return { ok: true, data: { id, messages, lastMessageId } };
+        const { messages, lastMessageId, lastTimestamp } = await slot.child.getMessages();
+        return { ok: true, data: { id, messages, lastMessageId, lastTimestamp } };
     }
     _opRegister(rawCwd) {
         try {

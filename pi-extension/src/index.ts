@@ -3663,9 +3663,9 @@ async function _cmdDaemonAsk(arg: string, ctx: Pick<ExtensionContext, "ui">): Pr
     return;
   }
   try {
-    // Baseline: the last message id right now.
+    // Baseline: the last message timestamp right now.
     const before = await callSupervisor({ op: "reply", id }, 20000);
-    const baselineId = before.lastMessageId;
+    const baselineTs = before.lastTimestamp;
 
     const sent = await callSupervisor({ op: "send", id, text });
     if (!sent.delivered) {
@@ -3673,25 +3673,19 @@ async function _cmdDaemonAsk(arg: string, ctx: Pick<ExtensionContext, "ui">): Pr
       return;
     }
 
-    // Poll until the last message id changes (agent produced a new reply),
-    // up to ~10 min.
+    // Poll until the last message timestamp advances past the baseline
+    // (agent produced new activity), up to ~10 min.
     const deadline = Date.now() + 600_000;
     const pollEveryMs = 8000;
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, pollEveryMs));
       const cur = await callSupervisor({ op: "reply", id }, 20000).catch(() => null);
       const msgs = cur?.messages ?? [];
-      const curId = cur?.lastMessageId;
-      if (curId && curId !== baselineId) {
-        // Everything from the baseline onward is new (best effort: slice from
-        // the first message after the baseline id).
-        let startIdx = 0;
-        if (baselineId) {
-          // messages are chronological; find the index after baselineId —
-          // we can't see ids in the text array, so fall back to last message.
-          startIdx = Math.max(0, msgs.length - 3);
-        }
-        const fresh = msgs.slice(startIdx);
+      const curTs = cur?.lastTimestamp;
+      if (curTs !== undefined && (baselineTs === undefined || curTs > baselineTs)) {
+        // messages are chronological; the fresh tail is everything after the
+        // baseline. We only have text messages here, so show the last few.
+        const fresh = msgs.slice(Math.max(0, msgs.length - 3));
         ctx.ui.notify(
           `[remote-omp] daemon ${id} asked → reply:\n${fresh.join("\n---\n").slice(0, 4000)}`,
           "info",

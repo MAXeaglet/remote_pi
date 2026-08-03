@@ -183,6 +183,7 @@ export declare class RpcChild extends EventEmitter {
     getMessages(timeoutMs?: number): Promise<{
         messages: string[];
         lastMessageId?: string;
+        lastTimestamp?: number;
     }>;
     /**
      * Switch the child's active session (RPC `switch_session`). omp/Pi RPC

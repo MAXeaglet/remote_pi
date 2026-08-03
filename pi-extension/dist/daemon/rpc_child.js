@@ -154,10 +154,13 @@ function parseGetMessagesResponse(line) {
         return null;
     const texts = [];
     let lastMessageId;
+    let lastTimestamp;
     for (const m of messages) {
         const mm = m;
         if (typeof mm.id === "string")
             lastMessageId = mm.id;
+        if (typeof mm.timestamp === "number")
+            lastTimestamp = mm.timestamp;
         if (mm.role !== "assistant")
             continue;
         const content = mm.content;
@@ -173,7 +176,7 @@ function parseGetMessagesResponse(line) {
             }
         }
     }
-    return { id: typeof o.id === "string" ? o.id : undefined, messages: texts, lastMessageId };
+    return { id: typeof o.id === "string" ? o.id : undefined, messages: texts, lastMessageId, lastTimestamp };
 }
 /**
  * CLI args for the daemon's `pi --mode rpc` child.
@@ -350,7 +353,7 @@ export class RpcChild extends EventEmitter {
             }, timeoutMs);
             this._messagesPending.set(id, { resolve, timer });
             try {
-                this.child.stdin.write(JSON.stringify({ id, type: "get_messages_page", limit: 100 }) + "\n");
+                this.child.stdin.write(JSON.stringify({ id, type: "get_messages_page", limit: 500 }) + "\n");
             }
             catch {
                 clearTimeout(timer);
@@ -437,7 +440,7 @@ export class RpcChild extends EventEmitter {
             if (pending) {
                 clearTimeout(pending.timer);
                 this._messagesPending.delete(gm.id);
-                pending.resolve({ messages: gm.messages, lastMessageId: gm.lastMessageId });
+                pending.resolve({ messages: gm.messages, lastMessageId: gm.lastMessageId, lastTimestamp: gm.lastTimestamp });
             }
         }
         this.emit("stdout", line);
