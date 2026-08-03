@@ -153,8 +153,11 @@ function parseGetMessagesResponse(line) {
     if (!Array.isArray(messages))
         return null;
     const texts = [];
+    let lastMessageId;
     for (const m of messages) {
         const mm = m;
+        if (typeof mm.id === "string")
+            lastMessageId = mm.id;
         if (mm.role !== "assistant")
             continue;
         const content = mm.content;
@@ -170,7 +173,7 @@ function parseGetMessagesResponse(line) {
             }
         }
     }
-    return { id: typeof o.id === "string" ? o.id : undefined, messages: texts };
+    return { id: typeof o.id === "string" ? o.id : undefined, messages: texts, lastMessageId };
 }
 /**
  * CLI args for the daemon's `pi --mode rpc` child.
@@ -337,13 +340,13 @@ export class RpcChild extends EventEmitter {
     getMessages(timeoutMs = 25000) {
         return new Promise((resolve) => {
             if (!this.child || !this.child.stdin || this._state !== "running") {
-                resolve([]);
+                resolve({ messages: [] });
                 return;
             }
             const id = `gm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const timer = setTimeout(() => {
                 this._messagesPending.delete(id);
-                resolve([]);
+                resolve({ messages: [] });
             }, timeoutMs);
             this._messagesPending.set(id, { resolve, timer });
             try {
@@ -352,7 +355,7 @@ export class RpcChild extends EventEmitter {
             catch {
                 clearTimeout(timer);
                 this._messagesPending.delete(id);
-                resolve([]);
+                resolve({ messages: [] });
             }
         });
     }
@@ -434,7 +437,7 @@ export class RpcChild extends EventEmitter {
             if (pending) {
                 clearTimeout(pending.timer);
                 this._messagesPending.delete(gm.id);
-                pending.resolve(gm.messages);
+                pending.resolve({ messages: gm.messages, lastMessageId: gm.lastMessageId });
             }
         }
         this.emit("stdout", line);

@@ -180,7 +180,7 @@ function parseGetStateResponse(line: string): { id?: string; isStreaming?: boole
 }
 
 /** Parses a `get_messages` RPC response line, extracting assistant text. */
-function parseGetMessagesResponse(line: string): { id?: string; messages: string[] } | null {
+function parseGetMessagesResponse(line: string): { id?: string; messages: string[]; lastMessageId?: string } | null {
   let obj: unknown;
   try { obj = JSON.parse(line); } catch { return null; }
   const o = obj as { type?: unknown; command?: unknown; id?: unknown; success?: unknown; data?: unknown };
@@ -189,8 +189,10 @@ function parseGetMessagesResponse(line: string): { id?: string; messages: string
   const messages = (o.data as { messages?: unknown })?.messages;
   if (!Array.isArray(messages)) return null;
   const texts: string[] = [];
+  let lastMessageId: string | undefined;
   for (const m of messages) {
-    const mm = m as { role?: unknown; content?: unknown };
+    const mm = m as { role?: unknown; content?: unknown; id?: unknown };
+    if (typeof mm.id === "string") lastMessageId = mm.id;
     if (mm.role !== "assistant") continue;
     const content = mm.content;
     if (typeof content === "string") { texts.push(content); continue; }
@@ -201,7 +203,7 @@ function parseGetMessagesResponse(line: string): { id?: string; messages: string
       }
     }
   }
-  return { id: typeof o.id === "string" ? o.id : undefined, messages: texts };
+  return { id: typeof o.id === "string" ? o.id : undefined, messages: texts, lastMessageId };
 }
 
 /**
@@ -273,7 +275,7 @@ export class RpcChild extends EventEmitter {
   /** In-flight `get_state` requests, keyed by request id. */
   private readonly _statePending = new Map<string, { resolve: (b: boolean) => void; timer: ReturnType<typeof setTimeout> }>();
   /** In-flight `get_messages` requests, keyed by request id. */
-  private readonly _messagesPending = new Map<string, { resolve: (msgs: string[]) => void; timer: ReturnType<typeof setTimeout> }>();
+  private readonly _messagesPending = new Map<string, { resolve: (r: { messages: string[]; lastMessageId?: string }) => void; timer: ReturnType<typeof setTimeout> }>();
 
   constructor(private readonly opts: RpcChildOptions) {
     super();
@@ -378,16 +380,16 @@ export class RpcChild extends EventEmitter {
    * so large sessions don't blow the transport limit. Returns assistant text
    * messages (chronological), or an empty array on timeout / not-running.
    */
-  getMessages(timeoutMs = 25000): Promise<string[]> {
+  getMessages(timeoutMs = 25000): Promise<{ messages: string[]; lastMessageId?: string }> {
     return new Promise((resolve) => {
       if (!this.child || !this.child.stdin || this._state !== "running") {
-        resolve([]);
+        resolve({ messages: [] });
         return;
       }
       const id = `gm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const timer = setTimeout(() => {
         this._messagesPending.delete(id);
-        resolve([]);
+        resolve({ messages: [] });
       }, timeoutMs);
       this._messagesPending.set(id, { resolve, timer });
       try {
@@ -395,7 +397,7 @@ export class RpcChild extends EventEmitter {
       } catch {
         clearTimeout(timer);
         this._messagesPending.delete(id);
-        resolve([]);
+        resolve({ messages: [] });
       }
     });
   }
@@ -469,7 +471,7 @@ export class RpcChild extends EventEmitter {
       if (pending) {
         clearTimeout(pending.timer);
         this._messagesPending.delete(gm.id);
-        pending.resolve(gm.messages);
+        pending.resolve({ messages: gm.messages, lastMessageId: gm.lastMessageId });
       }
     }
     this.emit("stdout", line);

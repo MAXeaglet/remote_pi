@@ -71,7 +71,7 @@ export interface ControlReplyShapes {
   restart: { id: string; state: DaemonState; restarted: boolean };
   send: { id: string; delivered: boolean };
   switch: { id: string; switched: boolean };
-  reply: { id: string; messages: string[] };
+  reply: { id: string; messages: string[]; lastMessageId?: string };
   register: { id: string; cwd: string };
   unregister: { removed: boolean; cwd?: string };
   // ── cron (plan/39) ──

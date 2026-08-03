@@ -180,7 +180,10 @@ export declare class RpcChild extends EventEmitter {
      * so large sessions don't blow the transport limit. Returns assistant text
      * messages (chronological), or an empty array on timeout / not-running.
      */
-    getMessages(timeoutMs?: number): Promise<string[]>;
+    getMessages(timeoutMs?: number): Promise<{
+        messages: string[];
+        lastMessageId?: string;
+    }>;
     /**
      * Switch the child's active session (RPC `switch_session`). omp/Pi RPC
      * protocol supports switching sessions in a long-lived process, so a daemon

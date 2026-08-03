@@ -2529,6 +2529,7 @@ const extension: ExtensionFactory = (pi: ExtensionAPI): void => {
   pi.registerCommand("remote-omp daemon send",    { description: "Send a prompt to a daemon: `daemon send <id> \"<text>\"`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonSend(args.trim(), ctx); } });
   pi.registerCommand("remote-omp daemon switch",  { description: "Switch a daemon to a different session: `daemon switch <id> <sessionPath>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonSwitch(args.trim(), ctx); } });
   pi.registerCommand("remote-omp daemon reply",   { description: "Fetch the last assistant reply from a daemon: `daemon reply <id>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonReply(args.trim(), ctx); } });
+  pi.registerCommand("remote-omp daemon ask",     { description: "Send a prompt and wait for the reply (synchronous round-trip): `daemon ask <id> \"<text>\"`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdDaemonAsk(args.trim(), ctx); } });
   pi.registerCommand("remote-omp cron",           { description: "Schedule recurring prompts to daemons: `cron <add|list|remove|enable|disable|run|log>`", handler: async (args, ctx) => { _lastCtx = ctx; await _cmdCron(args.trim(), ctx); } });
 
   // Service install / uninstall (plan/26 W3)
@@ -3641,6 +3642,67 @@ async function _cmdDaemonReply(id: string, ctx: Pick<ExtensionContext, "ui">): P
   } catch (err) {
     if (err instanceof SupervisorOfflineError) { _notifyOffline(ctx, err); return; }
     ctx.ui.notify(`[remote-omp] daemon reply failed: ${String(err)}`, "error");
+  }
+}
+
+/**
+ * `daemon ask <id> "<text>"` — send a prompt, then BLOCK until the agent
+ * produces a new assistant reply (polling `reply`), and print that reply.
+ * This gives a synchronous "指令 → 结果" round-trip for scripting.
+ */
+async function _cmdDaemonAsk(arg: string, ctx: Pick<ExtensionContext, "ui">): Promise<void> {
+  const m = arg.match(/^(\S+)\s+(?:"([^"]*)"|(.*))$/);
+  if (!m) {
+    ctx.ui.notify("[remote-omp] Usage: /remote-omp daemon ask <id> \"<prompt text>\"", "warning");
+    return;
+  }
+  const id = m[1]!;
+  const text = (m[2] ?? m[3] ?? "").trim();
+  if (!text) {
+    ctx.ui.notify("[remote-omp] daemon ask: prompt text is empty.", "warning");
+    return;
+  }
+  try {
+    // Baseline: the last message id right now.
+    const before = await callSupervisor({ op: "reply", id }, 20000);
+    const baselineId = before.lastMessageId;
+
+    const sent = await callSupervisor({ op: "send", id, text });
+    if (!sent.delivered) {
+      ctx.ui.notify(`[remote-omp] daemon ${id} did not accept the prompt (not running?)`, "warning");
+      return;
+    }
+
+    // Poll until the last message id changes (agent produced a new reply),
+    // up to ~10 min.
+    const deadline = Date.now() + 600_000;
+    const pollEveryMs = 8000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollEveryMs));
+      const cur = await callSupervisor({ op: "reply", id }, 20000).catch(() => null);
+      const msgs = cur?.messages ?? [];
+      const curId = cur?.lastMessageId;
+      if (curId && curId !== baselineId) {
+        // Everything from the baseline onward is new (best effort: slice from
+        // the first message after the baseline id).
+        let startIdx = 0;
+        if (baselineId) {
+          // messages are chronological; find the index after baselineId —
+          // we can't see ids in the text array, so fall back to last message.
+          startIdx = Math.max(0, msgs.length - 3);
+        }
+        const fresh = msgs.slice(startIdx);
+        ctx.ui.notify(
+          `[remote-omp] daemon ${id} asked → reply:\n${fresh.join("\n---\n").slice(0, 4000)}`,
+          "info",
+        );
+        return;
+      }
+    }
+    ctx.ui.notify(`[remote-omp] daemon ${id} ask: timed out after 10 min without a new reply.`, "warning");
+  } catch (err) {
+    if (err instanceof SupervisorOfflineError) { _notifyOffline(ctx, err); return; }
+    ctx.ui.notify(`[remote-omp] daemon ask failed: ${String(err)}`, "error");
   }
 }
 
@@ -5068,8 +5130,9 @@ if (_isDirectRun()) {
     else if (op === "send")    { await _cmdDaemonSend(rest, stubCtx); }
     else if (op === "switch")  { await _cmdDaemonSwitch(rest, stubCtx); }
     else if (op === "reply")   { await _cmdDaemonReply(cliArgs[1] ?? "", stubCtx); }
+    else if (op === "ask")     { await _cmdDaemonAsk(rest, stubCtx); }
     else {
-      console.log("Usage: remote-omp daemon <start|stop|restart [<id>]|status|send <id> \"<text>\"|switch <id> <sessionPath>|reply <id>>");
+      console.log("Usage: remote-omp daemon <start|stop|restart [<id>]|status|send <id> \"<text>\"|switch <id> <sessionPath>|reply <id>|ask <id> \"<text>\">");
     }
   } else if (subcmd === "cron") {
     // `remote-omp cron <op> [args]`. Re-quote args with spaces so the shared

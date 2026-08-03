@@ -143,6 +143,7 @@ export interface ControlReplyShapes {
     reply: {
         id: string;
         messages: string[];
+        lastMessageId?: string;
     };
     register: {
         id: string;
